@@ -19,8 +19,10 @@
         "yiisoft/yii2-redis": "*"
     },
     "autoload": {
-        "psr-4": {
-	        "atlasmobile\\queue\\": ""
-        }
+	    "autoload": {
+		    "psr-4": {
+			    "atlasmobile\\": "src/"
+		    }
+	    }
     }
 }

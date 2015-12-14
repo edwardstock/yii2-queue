@@ -1,7 +1,8 @@
 <?php
 
-namespace atlasmobile\queue;
+namespace atlasmobile\queue\drivers;
 
+use atlasmobile\queue\Queue;
 use Yii;
 use yii\db\Connection;
 use yii\db\Expression;

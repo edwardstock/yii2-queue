@@ -15,14 +15,15 @@ abstract class Queue extends Component
     /** @var bool Debug mode */
     public $debug = false;
 
-    /**
-     * Push job to the queue
-     *
-     * @param string $job Fully qualified class name of the job
-     * @param mixed $data Data for the job
-     * @param string|null $queue Queue name
-     * @return string ID of the job
-     */
+	/**
+	 * Push job to the queue
+	 *
+	 * @param string $job Fully qualified class name of the job
+	 * @param mixed $data Data for the job
+	 * @param string|null $queue Queue name
+	 * @param array $options
+	 * @return string ID of the job
+	 */
 	public function push($job, $data = null, $queue = null, $options = [])
     {
 	    return $this->pushInternal($this->createPayload($job, $data), $queue, $options);

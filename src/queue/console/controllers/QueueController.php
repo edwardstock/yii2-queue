@@ -64,7 +64,7 @@ class QueueController extends Controller
 
         while (true) {
             if (!$this->process($queueName, $queueObjectName)) {
-	            if($this->sleep > 0) sleep($this->sleep);
+	            usleep($this->sleep * 1000000);
             }
 
         }

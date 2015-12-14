@@ -16,7 +16,7 @@ The preferred way to install this extension is through [composer](http://getcomp
 Either run
 
 ```
-php composer.phar require --prefer-dist atlas/yii2-queue "*"
+php composer.phar require --prefer-dist atlasmobile/yii2-queue "*"
 ```
 
 or add

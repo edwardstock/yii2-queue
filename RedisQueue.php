@@ -1,6 +1,6 @@
 <?php
 
-namespace wh\queue;
+namespace atlas\queue;
 
 use Yii;
 use yii\base\InvalidConfigException;
@@ -9,7 +9,7 @@ use yii\redis\Connection;
 class RedisQueue extends Queue
 {
     /**
-     * @var string Default redis component name
+     * @var string|\Redis Default redis component name
      */
     public $redis = 'redis';
 

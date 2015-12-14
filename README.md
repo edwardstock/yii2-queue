@@ -2,8 +2,6 @@ Queue component for Yii2
 ====================
 This component provides simple queue wrapper
 
-I recommend  [yii2-asynctask](https://github.com/wayhood/yii2-asynctask).
-
 Requirements
 ------------
 
@@ -18,13 +16,13 @@ The preferred way to install this extension is through [composer](http://getcomp
 Either run
 
 ```
-php composer.phar require --prefer-dist wayhood/yii2-queue "*"
+php composer.phar require --prefer-dist atlas/yii2-queue "*"
 ```
 
 or add
 
 ```
-"wayhood/yii2-queue": "*"
+"atlas/yii2-queue": "*"
 ```
 
 to the require section of your `composer.json` file.
@@ -40,7 +38,7 @@ return [
     //....
     'components' => [
         'queue' => [
-            'class' => 'wh\queue\RedisQueue',
+            'class' => 'atlas\queue\RedisQueue',
         ],
         'redis' => [
             'class' => 'yii\redis\Connection',
@@ -61,7 +59,7 @@ namespace console\jobs;
 
 class MyJob
 {
-    public function run($job, $data)
+    public function run(\atlas\queue\Job $job, $data)
     {
         //process $data;
         var_dump($data);
@@ -92,7 +90,7 @@ Map console controller in your app config
 return [
     ...
     'controllerMap' => [
-        'queue' => 'wh\queue\console\controllers\QueueController'
+        'queue' => 'atlas\queue\console\controllers\QueueController'
     ],
     ...
 ];

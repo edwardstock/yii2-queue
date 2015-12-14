@@ -1,7 +1,9 @@
 <?php
 
-namespace wh\queue\console\controllers;
+namespace atlas\queue\console\controllers;
 
+use atlas\queue\Job;
+use atlas\queue\Queue;
 use Yii;
 use yii\console\Controller;
 
@@ -13,9 +15,7 @@ use yii\console\Controller;
  */
 class QueueController extends Controller
 {
-
-    private $timeout;
-    private $sleep=5;
+    private $sleep = 0;
 
     /**
      * Process a job
@@ -29,23 +29,21 @@ class QueueController extends Controller
         $this->process($queueName, $queueObjectName);
     }
 
-    /**
-     * Continuously process jobs
-     *
-     * @param string $queueName
-     * @param string $queueObjectName
-     * @throws \Exception
-     */
-    public function actionListen($queueName = null, $queueObjectName = 'queue')
+	/**
+	 * Continuously process jobs
+	 *
+	 * @param string $queueName
+	 * @param string $queueObjectName
+	 * @param int $sleep
+	 * @return bool
+	 */
+    public function actionListen($queueName = null, $queueObjectName = 'queue', $sleep = 0)
     {
+	    $this->sleep = $sleep;
+
         while (true) {
-            if ($this->timeout !==null) {
-                if ($this->timeout<time()) {
-                    return true;
-                }
-            }
             if (!$this->process($queueName, $queueObjectName)) {
-                sleep($this->sleep);
+	            if($this->sleep > 0) sleep($this->sleep);
             }
 
         }
@@ -53,7 +51,9 @@ class QueueController extends Controller
 
     protected function process($queueName, $queueObjectName)
     {
+	    /** @var Queue $queue */
         $queue = Yii::$app->{$queueObjectName};
+	    /** @var Job $job */
         $job = $queue->pop($queueName);
 
         if ($job) {
@@ -65,7 +65,7 @@ class QueueController extends Controller
                     var_dump($e);
                 }
 
-                Yii::error($e->getMessage(), __METHOD__);
+                Yii::error($e->getTraceAsString(), __METHOD__);
             }
         }
         return false;
@@ -75,10 +75,6 @@ class QueueController extends Controller
     {
         if (!parent::beforeAction($action)) {
             return false;
-        }
-
-        if (getenv('QUEUE_TIMEOUT')) {
-            $this->timeout=(int)getenv('QUEUE_TIMEOUT')+time();
         }
         if (getenv('QUEUE_SLEEP')) {
             $this->sleep=(int)getenv('QUEUE_SLEEP');

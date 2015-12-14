@@ -1,6 +1,6 @@
 <?php
 
-namespace wh\queue;
+namespace atlas\queue;
 
 use Yii;
 

@@ -1,6 +1,6 @@
 <?php
 
-namespace atlas\queue;
+namespace atlasmobile\queue;
 
 use Yii;
 use yii\base\InvalidConfigException;
@@ -31,23 +31,21 @@ class RedisQueue extends Queue
         }
     }
 
+	public function popInternal($queue = null) {
+		$payload = $this->redis->lpop($this->getQueue($queue));
+		if ($payload) {
+			//$this->redis->zadd($queue.':reserved', $this->getTime() + 60, $job);
+			return new Job($this, $payload, $queue);
+		}
+
+		return null;
+	}
+
     protected function pushInternal($payload, $queue = null, $options = [])
     {
         $this->redis->rpush($this->getQueue($queue), $payload);
         $payload = json_decode($payload, true);
 
         return $payload['id'];
-    }
-
-
-    public function popInternal($queue = null)
-    {
-        $payload = $this->redis->lpop($this->getQueue($queue));
-        if ($payload) {
-            //$this->redis->zadd($queue.':reserved', $this->getTime() + 60, $job);
-            return new Job($this, $payload, $queue);
-        }
-
-        return null;
     }
 } 

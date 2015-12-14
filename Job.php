@@ -1,6 +1,6 @@
 <?php
 
-namespace atlas\queue;
+namespace atlasmobile\queue;
 
 use Yii;
 
@@ -24,23 +24,22 @@ class Job
         $this->resolveAndRun(json_decode($this->payload, true));
     }
 
-    public function getQueueObject()
+	protected function resolveAndRun(array $payload)
     {
-        return $this->queueObject;
+	    list($class, $method) = $this->resolveJob($payload['job']);
+	    $instance = Yii::createObject([
+		    'class' => $class
+	    ]);
+	    $instance->{$method}($this, $payload['data']);
     }
 
-    protected function resolveAndRun(array $payload)
+	protected function resolveJob($job)
     {
-        list($class, $method) = $this->resolveJob($payload['job']);
-        $instance = Yii::createObject([
-            'class' => $class
-        ]);
-        $instance->{$method}($this, $payload['data']);
+	    $segments = explode('@', $job);
+	    return count($segments) > 1 ? $segments : [$segments[0], 'run'];
     }
 
-    protected function resolveJob($job)
-    {
-        $segments = explode('@', $job);
-        return count($segments) > 1 ? $segments : array($segments[0], 'run');
+    public function getQueueObject() {
+	    return $this->queueObject;
     }
 }

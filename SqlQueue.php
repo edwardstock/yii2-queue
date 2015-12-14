@@ -1,11 +1,11 @@
 <?php
 
-namespace atlas\queue;
+namespace atlasmobile\queue;
 
-use yii\db\Connection;
-use yii\db\Query;
-use yii\db\Expression;
 use Yii;
+use yii\db\Connection;
+use yii\db\Expression;
+use yii\db\Query;
 
 class SqlQueue extends Queue
 {
@@ -55,14 +55,9 @@ class SqlQueue extends Queue
         return true;
     }
 
-    private function createTable()
+	private function getTableName()
     {
-        $this->connection->createCommand()->createTable($this->getTableName(), [
-            'id' => 'pk COMMENT "1.0.0"',
-            'queue' => 'string(255)',
-            'run_at' => 'timestamp default CURRENT_TIMESTAMP NOT NULL',
-            'payload' => 'text',
-        ])->execute();
+	    return $this->default . '_queue';
     }
 
     public function dropTable()
@@ -70,66 +65,67 @@ class SqlQueue extends Queue
         $this->connection->createCommand()->dropTable($this->getTableName())->execute();
     }
 
-    private function getTableName()
+	private function createTable()
     {
-        return $this->default.'_queue';
+	    $this->connection->createCommand()->createTable($this->getTableName(), [
+		    'id'      => 'pk COMMENT "1.0.0"',
+		    'queue'   => 'string(255)',
+		    'run_at'  => 'timestamp default CURRENT_TIMESTAMP NOT NULL',
+		    'payload' => 'text',
+	    ])->execute();
     }
 
-    protected function pushInternal($payload, $queue = null, $options = [])
+	public function popInternal($queue = null) {
+		$row = $this->getQuery($this->getQueue($queue))->one($this->connection);
+		if ($row) {
+			$this->deleteQueue($row['id']);
+			return new Job($this, $row['payload'], $queue);
+		}
+		return null;
+	}
+
+	private function getQuery($queue)
     {
-        if (isset($options['run_at']) && ($options['run_at'] instanceof \DateTime)) {
-            $run_at=$options['run_at'];
-        } else {
-            $run_at=new \DateTime;
+	    if ($this->_query) {
+		    return $this->_query;
         }
 
-        $this->connection->schema->insert($this->getTableName(), [
-            'queue' => $this->getQueue($queue),
-            'payload' => $payload,
-            'run_at' => new Expression('FROM_UNIXTIME(:unixtime)', [
-                ':unixtime' => $run_at->format('U')
-            ])
-        ]);
+	    $this->_query = new Query;
+	    $this->_query->select('id, payload')
+		    ->from($this->getTableName())
+		    ->where(['queue' => $queue])
+		    ->andWhere('run_at <= NOW()')
+		    ->limit(1);
 
-        $payload = json_decode($payload, true);
-
-
-        return $payload['id'];
+	    return $this->_query;
     }
 
-    protected function getQueueInternal($queue = null)
-    {
-        return ($queue ?: $this->default);
+    private function deleteQueue($id) {
+	    $this->connection->createCommand()->delete($this->getTableName(), 'id=:id', [':id' => $id])->execute();
     }
 
+    protected function pushInternal($payload, $queue = null, $options = []) {
+	    if (isset($options['run_at']) && ($options['run_at'] instanceof \DateTime)) {
+		    $run_at = $options['run_at'];
+	    } else {
+		    $run_at = new \DateTime;
+	    }
 
-    private function getQuery($queue)
-    {
-        if ($this->_query) {
-            return $this->_query;
-        }
+	    $this->connection->schema->insert($this->getTableName(), [
+		    'queue'   => $this->getQueue($queue),
+		    'payload' => $payload,
+		    'run_at'  => new Expression('FROM_UNIXTIME(:unixtime)', [
+			    ':unixtime' => $run_at->format('U')
+		    ])
+	    ]);
 
-        $this->_query=new Query;
-        $this->_query->select('id, payload')
-                     ->from($this->getTableName())
-                     ->where(array('queue'=>$queue))
-                     ->andWhere('run_at <= NOW()')
-                     ->limit(1);
+	    $payload = json_decode($payload, true);
 
-        return $this->_query;
+
+	    return $payload['id'];
     }
-    private function deleteQueue($id)
-    {
-        $this->connection->createCommand()->delete($this->getTableName(), 'id=:id', [':id'=>$id])->execute();
-    }
 
-    public function popInternal($queue = null)
-    {
-        $row=$this->getQuery($this->getQueue($queue))->one($this->connection);
-        if ($row) {
-            $this->deleteQueue($row['id']);
-            return new Job($this, $row['payload'], $queue);
-        }
-        return null;
+    protected function getQueueInternal($queue = null) {
+	    return ($queue ?: $this->default);
     }
 }

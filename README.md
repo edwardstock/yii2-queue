@@ -38,7 +38,7 @@ return [
     //....
     'components' => [
         'queue' => [
-            'class' => 'atlas\queue\RedisQueue',
+            'class' => 'atlasmobile\queue\RedisQueue',
         ],
         'redis' => [
             'class' => 'yii\redis\Connection',
@@ -59,7 +59,7 @@ namespace console\jobs;
 
 class MyJob
 {
-    public function run(\atlas\queue\Job $job, $data)
+    public function run(\atlasmobile\queue\Job $job, $data)
     {
         //process $data;
         var_dump($data);
@@ -90,7 +90,7 @@ Map console controller in your app config
 return [
     ...
     'controllerMap' => [
-        'queue' => 'atlas\queue\console\controllers\QueueController'
+        'queue' => 'atlasmobile\queue\console\controllers\QueueController'
     ],
     ...
 ];

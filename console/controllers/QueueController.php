@@ -1,9 +1,9 @@
 <?php
 
-namespace atlas\queue\console\controllers;
+namespace atlasmobile\queue\console\controllers;
 
-use atlas\queue\Job;
-use atlas\queue\Queue;
+use atlasmobile\queue\Job;
+use atlasmobile\queue\Queue;
 use Yii;
 use yii\console\Controller;
 
@@ -29,6 +29,27 @@ class QueueController extends Controller
         $this->process($queueName, $queueObjectName);
     }
 
+	protected function process($queueName, $queueObjectName) {
+		/** @var Queue $queue */
+		$queue = Yii::$app->{$queueObjectName};
+		/** @var Job $job */
+		$job = $queue->pop($queueName);
+
+		if ($job) {
+			try {
+				$job->run();
+				return true;
+			} catch (\Exception $e) {
+				if ($queue->debug) {
+					var_dump($e);
+				}
+
+				Yii::error($e->getTraceAsString(), __METHOD__);
+			}
+		}
+		return false;
+	}
+
 	/**
 	 * Continuously process jobs
 	 *
@@ -47,28 +68,6 @@ class QueueController extends Controller
             }
 
         }
-    }
-
-    protected function process($queueName, $queueObjectName)
-    {
-	    /** @var Queue $queue */
-        $queue = Yii::$app->{$queueObjectName};
-	    /** @var Job $job */
-        $job = $queue->pop($queueName);
-
-        if ($job) {
-            try {
-                $job->run();
-                return true;
-            } catch (\Exception $e) {
-                if ($queue->debug) {
-                    var_dump($e);
-                }
-
-                Yii::error($e->getTraceAsString(), __METHOD__);
-            }
-        }
-        return false;
     }
 
     public function beforeAction($action)

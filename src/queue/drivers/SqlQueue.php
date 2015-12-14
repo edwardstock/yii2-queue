@@ -2,8 +2,10 @@
 
 namespace atlasmobile\queue\drivers;
 
+use atlasmobile\queue\Job;
 use atlasmobile\queue\Queue;
 use Yii;
+use yii\base\InvalidConfigException;
 use yii\db\Connection;
 use yii\db\Expression;
 use yii\db\Query;
@@ -11,7 +13,7 @@ use yii\db\Query;
 class SqlQueue extends Queue
 {
     /**
-     * @var string Default database connection component name
+     * @var string|Connection Default database connection component name
      */
     public $connection = 'db';
 

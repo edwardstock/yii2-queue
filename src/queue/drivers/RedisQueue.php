@@ -2,6 +2,7 @@
 
 namespace atlasmobile\queue\drivers;
 
+use atlasmobile\queue\Job;
 use atlasmobile\queue\Queue;
 use Yii;
 use yii\base\InvalidConfigException;

@@ -93,4 +93,11 @@ class QueuePayload
 	public function hasParam($key) {
 		return isset($this->arguments[$key]);
 	}
+
+	/**
+	 * @return string
+	 */
+	public function encode() {
+		return base64_encode(serialize($this));
+	}
 }

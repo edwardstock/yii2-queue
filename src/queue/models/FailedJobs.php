@@ -1,6 +1,7 @@
 <?php
 namespace atlasmobile\queue\models;
 
+use atlasmobile\queue\QueuePayload;
 use yii\db\ActiveRecord;
 
 /**
@@ -28,11 +29,11 @@ class FailedJobs extends ActiveRecord
 	 * @param $tries
 	 * @param $payload
 	 */
-	public static function add($class, $tries, $payload) {
+	public static function add($class, $tries, QueuePayload $payload) {
 		$failed = new FailedJobs();
 		$failed->class = $class;
 		$failed->tries = $tries;
-		$failed->payload = is_object($payload) ? serialize($payload) : $payload;
+		$failed->payload = $payload->encode();
 		$failed->log_time = time();
 		$failed->save(false);
 	}

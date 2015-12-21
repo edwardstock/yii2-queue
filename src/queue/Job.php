@@ -32,13 +32,12 @@ class Job
 	 */
 	public function __construct($queueObject, $payload, $queueName) {
 		$this->queueObject = $queueObject;
-		$decoded = json_decode($this->payload, true);
-		$this->payload = new QueuePayload($decoded->id, $decoded->job, $decoded->data);
+		$decoded = json_decode($payload);
+		$this->payload = new QueuePayload($decoded->id, $decoded->job, (array)$decoded->data);
 		$this->queueName = $queueName;
 	}
 
 	public function run() {
-		$decoded = json_decode($this->payload, true);
 		$this->resolveAndRun($this->payload);
 	}
 

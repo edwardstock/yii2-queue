@@ -1,5 +1,4 @@
 <?php
-
 namespace atlasmobile\queue;
 
 use Yii;
@@ -16,7 +15,7 @@ class Job
 	protected $queueObject;
 
 	/**
-	 * @var string Serialized object with job info
+	 * @var QueuePayload Serialized object with job info
 	 */
 	protected $payload;
 
@@ -33,24 +32,50 @@ class Job
 	 */
 	public function __construct($queueObject, $payload, $queueName) {
 		$this->queueObject = $queueObject;
-		$this->payload = $payload;
+		$decoded = json_decode($this->payload, true);
+		$this->payload = new QueuePayload($decoded->id, $decoded->job, $decoded->data);
 		$this->queueName = $queueName;
 	}
 
 	public function run() {
-		$this->resolveAndRun(json_decode($this->payload, true));
+		$decoded = json_decode($this->payload, true);
+		$this->resolveAndRun($this->payload);
 	}
 
 	/**
-	 * @param array $payload
+	 * @param QueuePayload $payload
+	 * @throws \Exception
 	 * @throws \yii\base\InvalidConfigException
 	 */
-	protected function resolveAndRun(array $payload) {
-		list($class, $method) = $this->resolveJob($payload['job']);
+	protected function resolveAndRun(QueuePayload $payload) {
+		list($class, $method) = $this->resolveJob($payload->getClass());
+
 		$instance = Yii::createObject([
 			'class' => $class
 		]);
-		$instance->{$method}($this, $payload['data']);
+
+		if ($instance instanceof BaseTask) {
+			$instance->beforeRun($this, $payload);
+		}
+
+		try {
+			if ($instance instanceof QueueHandler) {
+				$instance->run($this, $payload->getParams());
+			} else {
+				call_user_func([$instance, $method], $this, $payload->getParams());
+			}
+		} catch (\Exception $ex) {
+			if ($instance instanceof BaseTask) {
+				$instance->onFail($this, $payload, $ex);
+			}
+
+			throw $ex;
+		}
+
+
+		if ($instance instanceof BaseTask) {
+			$instance->afterRun($this, $payload);
+		}
 	}
 
 	/**
@@ -70,14 +95,14 @@ class Job
 	}
 
 	/**
-	 * @return mixed
+	 * @return string Serialized payload object
 	 */
 	public function getEncodedPayload() {
-		return json_decode($this->getPayload(), false);
+		return serialize($this->getPayload());
 	}
 
 	/**
-	 * @return string
+	 * @return QueuePayload
 	 */
 	public function getPayload() {
 		return $this->payload;

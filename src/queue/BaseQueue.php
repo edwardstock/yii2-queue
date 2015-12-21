@@ -9,7 +9,7 @@ use yii\base\Component;
  * atlas. 2015
  * @author Eduard Maximovich <edward.vstock@gmail.com>
  */
-abstract class Queue extends Component
+abstract class BaseQueue extends Component
 {
     /**
      * @var string Queue prefix
@@ -110,7 +110,7 @@ abstract class Queue extends Component
     /**
      * Get prefixed queue name
      *
-     * @param $queue Queue name
+     * @param $queue BaseQueue name
      * @return string
      */
 	protected function getQueue($queue) {

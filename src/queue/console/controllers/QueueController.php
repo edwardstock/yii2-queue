@@ -1,8 +1,8 @@
 <?php namespace atlasmobile\queue\console\controllers;
 
 use atlasmobile\models\FailedJobs;
+use atlasmobile\queue\BaseQueue;
 use atlasmobile\queue\Job;
-use atlasmobile\queue\Queue;
 use Yii;
 use yii\base\Exception;
 use yii\console\Controller;
@@ -46,8 +46,8 @@ class QueueController extends Controller
 	 * @throws \Exception
 	 */
 	protected function process() {
-		/** @var Queue $queue */
-		$queue = Yii::$app->{$this->queueObjectName};
+		/** @var BaseQueue $queue */
+		$queue = $this->getQueue();
 		/** @var Job $job */
 		$job = $queue->pop($this->queueName);
 
@@ -57,26 +57,26 @@ class QueueController extends Controller
 				return true;
 			} catch (\Exception $e) {
 				Yii::error($e->getTraceAsString(), self::$TAG);
-				$payload = $job->getEncodedPayload();
+				$payload = $job->getPayload();
 
-				if (!isset($payload->data)) {
-					$payload->data = new \stdClass();
+				if ($payload->getParams() === null) {
+					$payload->setParams([]);
 				}
 
-				if (isset($payload->data) && isset($payload->data->tries) && $payload->data->tries < $this->tries) {
-					$payload->data->tries++;
-					Yii::info("Tries " . $payload->data->tries . PHP_EOL, self::$TAG);
-				} else if (!isset($payload->data->tries)) {
-					$payload->data->tries = 1;
-					Yii::info("Tries " . $payload->data->tries . PHP_EOL, self::$TAG);
+				if ($payload->hasParam('tries') && $payload->getParam('tries', 0) < $this->tries) {
+					$payload->setParam('tries', $payload->getParam('tries', 0) + 1);
+					Yii::info("Tries " . $payload->getParam('tries', 0) . PHP_EOL, self::$TAG);
+				} else if (!$payload->hasParam('tries')) {
+					$payload->setParam('tries', 1);;
+					Yii::info("Tries " . $payload->getParam('tries', 0) . PHP_EOL, self::$TAG);
 				} else {
-					Yii::error("TRY #" . $payload->data->tries . ': ' . $e->getTraceAsString(), self::$TAG);
+					Yii::error("TRY #" . $payload->getParam('tries') . ': ' . $e->getTraceAsString(), self::$TAG);
 					if ($this->storeFailedJobs) {
-						$this->storeFailed($payload->job, $payload->data->tries, $payload);
+						$this->storeFailed($payload->getClass(), $payload->getParam('tries'), $payload);
 					}
 					throw $e;
 				}
-				$queue->push($payload->job, $payload->data, $job->getQueueName());
+				$queue->push($payload->getClass(), $payload->getParams(), $job->getQueueName());
 
 				throw $e;
 			}
@@ -84,13 +84,25 @@ class QueueController extends Controller
 		return false;
 	}
 
+	/**
+	 * @return BaseQueue
+	 */
+	private function getQueue() {
+		return Yii::$app->{$this->queueObjectName};
+	}
+
+	/**
+	 * @param string $className
+	 * @param int $tries
+	 * @param string $payload
+	 * @throws \yii\db\Exception
+	 */
 	private function storeFailed($className, $tries, $payload) {
 		try {
 			FailedJobs::add($className, $tries, $payload);
 		} catch (Exception $ex) {
 			throw new \yii\db\Exception('Table failed_jobs not created. Please, run: queue/table-failed');
 		}
-
 	}
 
 	/**
@@ -108,6 +120,10 @@ class QueueController extends Controller
 		}
 	}
 
+	/**
+	 * @param string $actionName
+	 * @return string
+	 */
 	private function buildWorkerCommand($actionName = 'work') {
 		$cmd = [];
 		$cmd[] = PHP_BINARY;
@@ -140,5 +156,19 @@ class QueueController extends Controller
 		$this->run('migrate/up', [
 			'migrationPath' => '@vendor/atlasmobile/yii2-queue/src/migrations'
 		]);
+	}
+
+	/**
+	 * Handle failed jobs. Adds they to queue.
+	 */
+	public function actionFailed() {
+		/** @var FailedJobs $item */
+		foreach (FailedJobs::find()->all() AS $item) {
+			$payload = unserialize($item->payload);
+			$payload->data->tries = 0;
+
+			$this->getQueue()->push($item->class, $payload->data, $this->queueName);
+			$item->delete();
+		}
 	}
 }

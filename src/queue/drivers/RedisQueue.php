@@ -2,8 +2,8 @@
 
 namespace atlasmobile\queue\drivers;
 
+use atlasmobile\queue\BaseQueue;
 use atlasmobile\queue\Job;
-use atlasmobile\queue\Queue;
 use Yii;
 use yii\base\InvalidConfigException;
 use yii\redis\Connection;
@@ -12,7 +12,7 @@ use yii\redis\Connection;
  * atlas. 2015
  * @author Eduard Maximovich <edward.vstock@gmail.com>
  */
-class RedisQueue extends Queue
+class RedisBaseQueue extends BaseQueue
 {
     /**
      * @var string|\Redis Default redis component name

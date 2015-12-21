@@ -1,5 +1,5 @@
 <?php
-namespace atlasmobile\models;
+namespace atlasmobile\queue\models;
 
 use yii\db\ActiveRecord;
 

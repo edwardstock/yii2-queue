@@ -1,8 +1,8 @@
 <?php namespace atlasmobile\queue\console\controllers;
 
-use atlasmobile\models\FailedJobs;
 use atlasmobile\queue\BaseQueue;
 use atlasmobile\queue\Job;
+use atlasmobile\queue\models\FailedJobs;
 use Yii;
 use yii\base\Exception;
 use yii\console\Controller;
@@ -154,7 +154,7 @@ class QueueController extends Controller
 	 */
 	public function actionTableFailed() {
 		$this->run('migrate/up', [
-			'migrationPath' => '@vendor/atlasmobile/yii2-queue/src/migrations'
+			'migrationPath' => '@vendor/atlasmobile/yii2-queue/src/queue/migrations'
 		]);
 	}
 

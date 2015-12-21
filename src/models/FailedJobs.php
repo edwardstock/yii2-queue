@@ -32,7 +32,7 @@ class FailedJobs extends ActiveRecord
 		$failed = new FailedJobs();
 		$failed->class = $class;
 		$failed->tries = $tries;
-		$failed->payload = $payload;
+		$failed->payload = is_object($payload) ? serialize($payload) : $payload;
 		$failed->log_time = time();
 		$failed->save(false);
 	}

@@ -166,7 +166,7 @@ class QueueController extends Controller
 		/** @var FailedJobs $item */
 		foreach (FailedJobs::find()->all() AS $item) {
 			/** @var QueuePayload $payload */
-			$payload = base64_decode(unserialize($item->payload));
+			$payload = unserialize(base64_decode($item->payload));
 			$payload->setParam('tries', 0);
 
 			$this->getQueue()->push($item->class, $payload->getParams(), $this->queueName);

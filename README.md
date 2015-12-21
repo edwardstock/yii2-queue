@@ -107,13 +107,13 @@ You can use component directly or static method to push job to queue: \atlasmobi
 Yii::$app->queue->push(\console\jobs\MyJob::class, ['a', 'b', 'c']); 
 
 // or push it and execute any other method
-Yii::$app->queue->push(\console\jobs\MyJob@myMethod::class, ['a', 'b', 'c']);
+Yii::$app->queue->push('\console\jobs\MyJob@myMethod', ['a', 'b', 'c']);
 
 // or push it to some specific queue
 Yii::$app->queue->push(\console\jobs\MyJob::class, ['a', 'b', 'c'], 'myQueue');
 
 // or both
-Yii::$app->queue->push(\console\jobs\MyJob@myMethod::class, ['a', 'b', 'c'], 'myQueue');
+Yii::$app->queue->push('\console\jobs\MyJob@myMethod', ['a', 'b', 'c'], 'myQueue');
 
 ```
 

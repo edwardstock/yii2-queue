@@ -11,14 +11,14 @@ abstract class BaseTask implements QueueHandler
 	 * @param Job $job
 	 * @param QueuePayload $payload
 	 */
-	public function beforeRun(Job $job, QueuePayload $payload = []) {
+	public function beforeRun(Job $job, QueuePayload $payload) {
 	}
 
 	/**
 	 * @param Job $job
 	 * @param QueuePayload $payload
 	 */
-	public function afterRun(Job $job, QueuePayload $payload = []) {
+	public function afterRun(Job $job, QueuePayload $payload) {
 	}
 
 	/**
@@ -26,6 +26,6 @@ abstract class BaseTask implements QueueHandler
 	 * @param QueuePayload $payload
 	 * @param \Exception $exception
 	 */
-	public function onFail(Job $job, QueuePayload $payload = [], \Exception $exception) {
+	public function onFail(Job $job, QueuePayload $payload, \Exception $exception) {
 	}
 }

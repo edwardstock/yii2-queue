@@ -84,7 +84,7 @@ class MyJob extends \atlasmobile\queue\BaseTask
         var_dump($data);
     }
     
-    public function afterFun(Job $job, QueuePayload $payload = []) {
+    public function afterRun(Job $job, QueuePayload $payload = []) {
     	//todo after running task
     }
     

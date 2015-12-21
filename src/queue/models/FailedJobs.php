@@ -2,6 +2,7 @@
 namespace atlasmobile\queue\models;
 
 use atlasmobile\queue\QueuePayload;
+use Yii;
 use yii\db\ActiveRecord;
 
 /**
@@ -17,6 +18,15 @@ use yii\db\ActiveRecord;
  */
 class FailedJobs extends ActiveRecord
 {
+	/**
+	 * Truncates table with failed jobs
+	 * @throws \yii\db\Exception
+	 */
+	public static function truncate() {
+		$cmd = Yii::$app->db->createCommand();
+		$cmd->truncateTable(self::tableName());
+		$cmd->execute();
+	}
 
 	/**
 	 * @inheritdoc

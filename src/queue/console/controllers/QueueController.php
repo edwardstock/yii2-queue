@@ -7,6 +7,7 @@ use atlasmobile\queue\QueuePayload;
 use Yii;
 use yii\base\Exception;
 use yii\console\Controller;
+use yii\helpers\Console;
 
 /**
  * Queue Process Command
@@ -154,7 +155,7 @@ class QueueController extends Controller
 	/**
 	 * Creates table with failed jobs
 	 */
-	public function actionTableFailed() {
+	public function actionFailedTable() {
 		$this->run('migrate/up', [
 			'migrationPath' => '@vendor/atlasmobile/yii2-queue/src/queue/migrations'
 		]);
@@ -165,7 +166,7 @@ class QueueController extends Controller
 	 */
 	public function actionFailed() {
 		/** @var FailedJobs $item */
-		foreach (FailedJobs::find()->all() AS $item) {
+		foreach (FailedJobs::find()->orderBy('id ASC')->all() AS $item) {
 			/** @var QueuePayload $payload */
 			$payload = unserialize(base64_decode($item->payload));
 			$payload->setParam('tries', 0);
@@ -173,5 +174,16 @@ class QueueController extends Controller
 			$this->getQueue()->push($item->class, $payload->getParams(), $this->queueName);
 			$item->delete();
 		}
+	}
+
+	/**
+	 * Flush all failed jobs
+	 */
+	public function actionFailedFlush() {
+		$this->stdout("Flushing failed jobs:\t", Console::FG_GREEN);
+		FailedJobs::truncate();
+		$this->stdout("[");
+		$this->stdout('OK', Console::FG_YELLOW | Console::BOLD);
+		$this->stdout("]\n");
 	}
 }

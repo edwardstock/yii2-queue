@@ -68,12 +68,12 @@ class QueueController extends Controller
 					$payload->setParam('tries', $payload->getParam('tries', 0) + 1);
 					Yii::info("Tries " . $payload->getParam('tries', 0) . PHP_EOL, self::$TAG);
 				} else if (!$payload->hasParam('tries')) {
-					$payload->setParam('tries', 1);;
+					$payload->setParam('tries', 1);
 					Yii::info("Tries " . $payload->getParam('tries', 0) . PHP_EOL, self::$TAG);
 				} else {
 					Yii::error("TRY #" . $payload->getParam('tries') . ': ' . $e->getTraceAsString(), self::$TAG);
 					if ($this->storeFailedJobs) {
-						$this->storeFailed($payload->getClass(), $payload->getParam('tries'), $payload);
+						$this->storeFailed($payload->getClass(), $payload->getParam('tries'), $payload, $e);
 					}
 					throw $e;
 				}
@@ -95,12 +95,13 @@ class QueueController extends Controller
 	/**
 	 * @param string $className
 	 * @param int $tries
-	 * @param string $payload
+	 * @param QueuePayload $payload
+	 * @param \Exception $exception
 	 * @throws \yii\db\Exception
 	 */
-	private function storeFailed($className, $tries, $payload) {
+	private function storeFailed($className, $tries, QueuePayload $payload, \Exception $exception) {
 		try {
-			FailedJobs::add($className, $tries, $payload);
+			FailedJobs::add($className, $tries, $payload, $exception);
 		} catch (Exception $ex) {
 			throw new \yii\db\Exception('Table failed_jobs not created. Please, run: queue/table-failed');
 		}

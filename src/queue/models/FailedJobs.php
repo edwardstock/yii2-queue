@@ -13,6 +13,7 @@ use yii\db\ActiveRecord;
  * @property int tries
  * @property int log_time
  * @property string payload
+ * @property string stack_trace
  */
 class FailedJobs extends ActiveRecord
 {
@@ -27,14 +28,16 @@ class FailedJobs extends ActiveRecord
 	/**
 	 * @param $class
 	 * @param $tries
-	 * @param $payload
+	 * @param QueuePayload $payload
+	 * @param \Exception $exception
 	 */
-	public static function add($class, $tries, QueuePayload $payload) {
+	public static function add($class, $tries, QueuePayload $payload, \Exception $exception) {
 		$failed = new FailedJobs();
 		$failed->class = $class;
 		$failed->tries = $tries;
 		$failed->payload = $payload->encode();
 		$failed->log_time = time();
+		$failed->stack_trace = $exception->getTraceAsString();
 		$failed->save(false);
 	}
 }

@@ -12,7 +12,7 @@ use yii\redis\Connection;
  * atlas. 2015
  * @author Eduard Maximovich <edward.vstock@gmail.com>
  */
-class RedisBaseQueue extends BaseQueue
+class RedisQueue extends BaseQueue
 {
     /**
      * @var string|\Redis Default redis component name

@@ -14,7 +14,7 @@ use yii\db\Query;
  * atlas. 2015
  * @author Eduard Maximovich <edward.vstock@gmail.com>
  */
-class SqlBaseQueue extends BaseQueue
+class SqlQueue extends BaseQueue
 {
 	/**
 	 * @var string|Connection Default database connection component name

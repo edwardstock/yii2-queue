@@ -8,6 +8,10 @@ use Yii;
 use yii\base\InvalidConfigException;
 use yii\redis\Connection;
 
+/**
+ * atlas. 2015
+ * @author Eduard Maximovich <edward.vstock@gmail.com>
+ */
 class RedisQueue extends Queue
 {
     /**

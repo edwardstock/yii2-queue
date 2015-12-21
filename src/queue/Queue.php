@@ -5,6 +5,10 @@ namespace atlasmobile\queue;
 use Yii;
 use yii\base\Component;
 
+/**
+ * atlas. 2015
+ * @author Eduard Maximovich <edward.vstock@gmail.com>
+ */
 abstract class Queue extends Component
 {
     /**

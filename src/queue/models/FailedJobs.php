@@ -37,7 +37,8 @@ class FailedJobs extends ActiveRecord
 		$failed->tries = $tries;
 		$failed->payload = $payload->encode();
 		$failed->log_time = time();
-		$failed->stack_trace = $exception->getTraceAsString();
+		$failed->stack_trace = $exception->getMessage();
+		$failed->stack_trace .= "\n\n" . $exception->getTraceAsString();
 		$failed->save(false);
 	}
 }

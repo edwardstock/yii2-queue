@@ -3,6 +3,7 @@
 use atlasmobile\queue\BaseQueue;
 use atlasmobile\queue\Job;
 use atlasmobile\queue\models\FailedJobs;
+use atlasmobile\queue\QueuePayload;
 use Yii;
 use yii\base\Exception;
 use yii\console\Controller;
@@ -164,10 +165,11 @@ class QueueController extends Controller
 	public function actionFailed() {
 		/** @var FailedJobs $item */
 		foreach (FailedJobs::find()->all() AS $item) {
-			$payload = unserialize($item->payload);
-			$payload->data->tries = 0;
+			/** @var QueuePayload $payload */
+			$payload = base64_decode(unserialize($item->payload));
+			$payload->setParam('tries', 0);
 
-			$this->getQueue()->push($item->class, $payload->data, $this->queueName);
+			$this->getQueue()->push($item->class, $payload->getParams(), $this->queueName);
 			$item->delete();
 		}
 	}

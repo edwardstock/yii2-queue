@@ -74,7 +74,7 @@ namespace console\jobs;
 
 class MyJob extends \atlasmobile\queue\BaseTask
 {
-	public function beforeRun(Job $job, QueuePayload $payload = []) {
+	public function beforeRun(Job $job, QueuePayload $payload) {
 		//todo before running task
 	}
 
@@ -84,11 +84,11 @@ class MyJob extends \atlasmobile\queue\BaseTask
         var_dump($data);
     }
     
-    public function afterRun(Job $job, QueuePayload $payload = []) {
+    public function afterRun(Job $job, QueuePayload $payload) {
     	//todo after running task
     }
     
-    public function onFail(Job $job, QueuePayload $payload = [], \Exception $exception) {
+    public function onFail(Job $job, QueuePayload $payload, \Exception $exception) {
     	//todo what to do on fail running task
     }
 } 

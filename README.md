@@ -168,7 +168,7 @@ stderr_logfile_maxbytes=10M
 
 First, run migration to create table of failed jobs
 ```
- ./yii queue/table-failed
+ ./yii queue/failed-table
 ```
 
 and run 

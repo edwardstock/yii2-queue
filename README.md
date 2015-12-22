@@ -101,7 +101,8 @@ and than just push job to queue
 
 ```php
 
-You can use component directly or static method to push job to queue: \atlasmobile\queue\helpers\Queue::push($job, $data = null, $queue = 'default', $options = [])
+// You can use component directly or static method to push job to queue: 
+\atlasmobile\queue\helpers\Queue::push($job, $data = null, $queue = 'default', $options = [])
 
 // Push job to the default queue and execute "run" method
 Yii::$app->queue->push(\console\jobs\MyJob::class, ['a', 'b', 'c']); 

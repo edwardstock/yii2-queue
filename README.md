@@ -6,6 +6,7 @@ Requirements
 ------------
 
 [Redis](http://redis.io)
+
 [yii2-redis](https://github.com/yiisoft/yii2-redis)
 
 Installation
@@ -16,7 +17,7 @@ The preferred way to install this extension is through [composer](http://getcomp
 Either run
 
 ```
-php composer.phar require --prefer-dist atlasmobile/yii2-queue "*"
+composer require --prefer-dist "atlasmobile/yii2-queue=*"
 ```
 
 or add
@@ -28,8 +29,9 @@ or add
 to the require section of your `composer.json` file.
 
 
-Usage
------
+
+Application configuration
+-------------------------
 
 To use this extension, simply add the following code in your application configuration:
 
@@ -46,11 +48,17 @@ return [
             'port' => 6379,
             'database' => 0
         ],
+        
+        'controllerMap' => [
+            'queue' => \atlasmobile\queue\console\controllers\QueueController::class,
+        ],
     ],
 ];
 ```
 
 
+First Job
+---------
 
 First create a Job process class
 
@@ -119,20 +127,28 @@ Yii::$app->queue->push('\console\jobs\MyJob@myMethod', ['a', 'b', 'c'], 'myQueue
 ```
 
 
-Map console controller in your app config
 
-```php
-return [
-    ...
-    'controllerMap' => [
-        'queue' => \atlasmobile\queue\console\controllers\QueueController::class,
-    ],
-    ...
-];
+Listener
+--------
+
+### If you wanna use supervisor, put this config:
+
+```ini
+[program:yiiqueue]
+command=php /path/to/project/yii queue/listen
+process_name=%(program_name)s_%(process_num)02d
+numprocs=4  ; customize workers
+directory=/path/to/project
+autostart=true
+autorestart=true
+user=nginx ; executor user
+stdout_logfile=/path/to/project/runtime/logs/queue.out.log
+stdout_logfile_maxbytes=10MB
+stderr_logfile=/path/to/project/runtime/logs/queue.err.log
+stderr_logfile_maxbytes=10M
 ```
 
-Examples of using queue controller:
-
+### Queue listener examples:
 ```
 # Process a first job from default queue and than exit the process
 ./yii queue/work
@@ -148,13 +164,16 @@ Examples of using queue controller:
 
 ```
 
-Also you can store failed jobs into db
+### Also you can store failed jobs into db
 
-```bash
-./yii queue/table-failed //will migrate table for failed jobs
+First, run migration to create table of failed jobs
+```
+ ./yii queue/table-failed
+```
 
+and run 
+``` 
 ./yii queue/listen --storeFailedJobs=true
-
 ```
 
 Then after some time when table will filled with failed jobs, do next:
@@ -162,5 +181,11 @@ Then after some time when table will filled with failed jobs, do next:
 ```bash 
 ./yii queue/failed 
 ```
-
 This command will add to queue all failed jobs in FIFO order
+
+
+To clear table with failed jobs:
+```bash
+./yii queue/failed-flush
+```
+

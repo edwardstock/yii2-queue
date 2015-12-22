@@ -166,7 +166,7 @@ stderr_logfile_maxbytes=10M
 
 ### Also you can store failed jobs into db
 
-First, run migration to create table of failed jobs
+First, run migration to create table with failed jobs
 ```
  ./yii queue/failed-table
 ```
@@ -181,10 +181,10 @@ Then after some time when table will filled with failed jobs, do next:
 ```bash 
 ./yii queue/failed 
 ```
-This command will add to queue all failed jobs in FIFO order
+This command will add to queue all failed jobs in [FIFO](https://en.wikipedia.org/wiki/FIFO_and_LIFO_accounting) (first-in-first-out) order
 
 
-To clear table with failed jobs:
+To flush table with failed jobs:
 ```bash
 ./yii queue/failed-flush
 ```

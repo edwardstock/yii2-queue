@@ -145,7 +145,7 @@ user=nginx ; executor user
 stdout_logfile=/path/to/project/runtime/logs/queue.out.log
 stdout_logfile_maxbytes=10MB
 stderr_logfile=/path/to/project/runtime/logs/queue.err.log
-stderr_logfile_maxbytes=10M
+stderr_logfile_maxbytes=10MB
 ```
 
 ### Queue listener examples:

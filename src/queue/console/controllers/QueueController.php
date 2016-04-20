@@ -10,7 +10,9 @@ use Yii;
 use yii\base\Exception;
 use yii\console\Controller;
 use yii\helpers\Console;
+use yii\helpers\Json;
 use yii\helpers\VarDumper;
+use yii\redis\Connection;
 
 /**
  * Queue Process Command
@@ -35,6 +37,7 @@ class QueueController extends Controller
 
 	public function init() {
 		pcntl_signal(SIGTERM, [$this, 'signalHandler']);
+		pcntl_signal_dispatch();
 		parent::init();
 	}
 
@@ -62,6 +65,14 @@ class QueueController extends Controller
 			$this->getQueue()->push($item->class, $payload->getParams(), $this->queueName);
 			$item->delete();
 		}
+	}
+
+	/**
+	 * @return BaseQueue
+	 */
+	private function getQueue()
+	{
+		return Yii::$app->{$this->queueObjectName};
 	}
 
 	/**
@@ -99,6 +110,37 @@ class QueueController extends Controller
 		}
 	}
 
+	/**
+	 * @param string $actionName
+	 * @return string
+	 */
+	private function buildWorkerCommand($actionName = 'work')
+	{
+		$cmd = [];
+		$cmd[] = PHP_BINARY;
+		$cmd[] = Yii::$app->basePath . '/../yii queue/' . $actionName;
+		$params = [];
+		foreach ($this->options(null) AS $option) {
+			if (in_array($option, parent::options(null))) continue;
+			$params['--' . $option] = $this->$option;
+		}
+
+		$out = implode(' ', $cmd) . ' ';
+		foreach ($params AS $k => $v) {
+			$out .= $k . '=' . $v;
+			$out .= ' ';
+		}
+
+		return $out;
+	}
+
+	public function options($actionID)
+	{
+		return array_merge(parent::options($actionID), [
+			'tries', 'sleep', 'queueName', 'queueObjectName', 'storeFailedJobs'
+		]);
+	}
+
 	public function actionTail($lastRowsCount = 10) {
 
 	}
@@ -110,12 +152,6 @@ class QueueController extends Controller
 	 */
 	public function actionWork() {
 		$this->process();
-	}
-
-	public function options($actionID) {
-		return array_merge(parent::options($actionID), [
-			'tries', 'sleep', 'queueName', 'queueObjectName', 'storeFailedJobs'
-		]);
 	}
 
 	/**
@@ -164,18 +200,6 @@ class QueueController extends Controller
 		return false;
 	}
 
-	private function signalHandler($signo) {
-		$this->working = false;
-		Yii::info('SIGTERM received', __METHOD__);
-	}
-
-	/**
-	 * @return BaseQueue
-	 */
-	private function getQueue() {
-		return Yii::$app->{$this->queueObjectName};
-	}
-
 	/**
 	 * @param string $className
 	 * @param int $tries
@@ -191,26 +215,60 @@ class QueueController extends Controller
 		}
 	}
 
-	/**
-	 * @param string $actionName
-	 * @return string
-	 */
-	private function buildWorkerCommand($actionName = 'work') {
-		$cmd = [];
-		$cmd[] = PHP_BINARY;
-		$cmd[] = Yii::$app->basePath . '/../yii queue/' . $actionName;
-		$params = [];
-		foreach ($this->options(null) AS $option) {
-			if (in_array($option, parent::options(null))) continue;
-			$params['--' . $option] = $this->$option;
-		}
+	public function actionMonitor($q = 'queue:default', $showJobs = false)
+	{
+		/** @var Connection $q */
+		$redis = Yii::$app->redis;
 
-		$out = implode(' ', $cmd) . ' ';
-		foreach ($params AS $k => $v) {
-			$out .= $k . '=' . $v;
-			$out .= ' ';
-		}
+		$up = function (int $times = 1) {
+			for ($i = 0; $i < $times; $i++) {
+				echo "\r"; //start of line
+				echo "\033[K"; //erase full line
+				echo "\033[1A"; //move up
+			}
+		};
 
-		return $out;
+		while ($this->working) {
+			$result = $redis->lrange($q, 0, -1);
+
+			$out = [
+				'jobs' => [],
+				'countJobs' => sizeof($result),
+			];
+
+			if ($showJobs) {
+				foreach ($result AS $item) {
+					$uItem = Json::decode($item);
+					$className = $uItem['job'];
+					$data = Json::encode($uItem['data'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+					$out['jobs'][] = "{$className}" . " --> " . $data;
+				}
+			} else {
+				$uniqueJobs = [];
+				foreach ($result AS $item) {
+					$uItem = Json::decode($item);
+					$className = $uItem['job'];
+					if (!isset($uniqueJobs[$className])) {
+						$uniqueJobs[$className] = 1;
+					} else {
+						$uniqueJobs[$className]++;
+					}
+				}
+
+				$out['jobs'] = $uniqueJobs;
+			}
+			$s = VarDumper::export($out);
+			$countNewLines = substr_count($s, "\n");
+			echo $s;
+			sleep(2);
+			$up($countNewLines);
+			unset($result, $out, $s, $countNewLines);
+		}
+	}
+
+	private function signalHandler($signo)
+	{
+		$this->working = false;
+		Yii::info('SIGTERM received', __METHOD__);
 	}
 }

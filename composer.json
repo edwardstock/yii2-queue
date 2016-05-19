@@ -2,7 +2,7 @@
 	"name": "atlasmobile/yii2-queue",
 	"description": "yii2 queue component",
 	"type": "yii2-extension",
-	"version": "1.0.5",
+	"version": "1.0.7",
 	"keywords": [
 		"yii2",
 		"extension",

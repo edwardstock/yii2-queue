@@ -254,7 +254,7 @@ class QueueController extends Controller
 				$job->run();
 				return true;
 			} catch (\Exception $e) {
-				if ((int)$this->tries === 0) {
+				if ((int)$this->tries < 1) {
 					throw $e;
 				}
 
@@ -269,17 +269,19 @@ class QueueController extends Controller
 					$payload->setParam('tries', 0);
 				}
 
+				$msg = "Error executing job. \n{$e->getMessage()}\n{$e->getTraceAsString()}\n\nData: " . VarDumper::export($payload->getParams()) . "\nTRY #" . $workedTries . PHP_EOL;
+				if ($this->debug) {
+					echo $msg;
+				}
+				Yii::warning($msg, self::$TAG);
 				if ($workedTries < $this->tries) {
-					$msg = "Error executing job. \n{$e->getMessage()}\n{$e->getTraceAsString()}\n\nData: " . VarDumper::export($payload->getParams()) . "\nTRY #" . $workedTries . PHP_EOL;
-					if ($this->debug) {
-						echo $msg;
-					}
-					Yii::warning($msg, self::$TAG);
+					$payload->setParam('tries', $workedTries + 1);
 					$queue->push($payload->getClass(), $payload->getParams(), $job->getQueueName());
 					if ($this->storeFailedJobs) {
 						$this->storeFailed($payload->getClass(), $payload->getParam('tries'), $payload, $e);
 					}
 				} else {
+					Yii::warning($msg, self::$TAG);
 					throw $e;
 				}
 

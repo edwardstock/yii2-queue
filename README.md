@@ -126,6 +126,23 @@ Yii::$app->queue->push('\console\jobs\MyJob@myMethod', ['a', 'b', 'c'], 'myQueue
 
 ```
 
+#### Since 1.0.5 available delayed tasks
+```php
+
+// Just a string
+Yii::$app->queue->pushDelayed(\console\jobs\MyJob::class, '+3 hours', ['a', 'b', 'c']);
+ 
+// Or \DateTime
+$dt = new \DateTime('now');
+$dt->modify('+1 week')->modify('+3 days');
+Yii::$app->queue->pushDelayed(\console\jobs\MyJob::class, $dt, ['a', 'b', 'c']);
+
+
+// Or oldschool
+Yii::$app->queue->pushDelayed(\console\jobs\MyJob::class, time() + 86400, ['a', 'b', 'c']);
+
+```
+
 
 
 Listener
@@ -164,6 +181,19 @@ stderr_logfile_maxbytes=10MB
 
 ```
 
+
+### Delayed listener examples (since 1.0.5):
+```bash
+# Pop list of delayed jobs and if "time to work", puts them to queue
+./yii queue/delayed
+
+# Or for supervisor or just for "&"
+./yii queue/listen-delayed
+```
+
+Method listen-delayed by defaults check new delayed jobs every 30 seconds, but u can set --pollFreqSecs=MY_SECONDS
+
+
 ### Also you can store failed jobs into db
 
 First, run migration to create table with failed jobs
@@ -187,5 +217,13 @@ This command will add to queue all failed jobs in [FIFO](https://en.wikipedia.or
 To flush table with failed jobs:
 ```bash
 ./yii queue/failed-flush
+```
+
+### Monitor
+In some cases you may want to see how much and/or what jobs are queued now.
+To see basic information, use:
+
+```bash
+./yii queue/monitor
 ```
 

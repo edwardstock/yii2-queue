@@ -270,7 +270,7 @@ class QueueController extends Controller
 				}
 
 				if ($workedTries < $this->tries) {
-					$msg = "Error executing job. \nData: " . VarDumper::export($payload->getParams()) . "\nTRY #" . $workedTries . PHP_EOL;
+					$msg = "Error executing job. \n{$e->getMessage()}\n{$e->getTraceAsString()}\n\nData: " . VarDumper::export($payload->getParams()) . "\nTRY #" . $workedTries . PHP_EOL;
 					if ($this->debug) {
 						echo $msg;
 					}

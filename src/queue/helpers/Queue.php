@@ -12,12 +12,11 @@ class Queue
 {
 
 	/**
-	 * @param string $job Class name of job handler. Class must implements Queueable
+	 * @param string $job Class name of job handler. Class must implements QueueHandler
 	 * @param null $data
 	 * @param string $queue
-	 * @param array $options
 	 */
-	public static function push($job, $data = null, $queue = 'default', $options = []) {
+	public static function push($job, $data = null, $queue = 'default') {
 		$preparedData = [];
 		if (is_array($data)) {
 			foreach ($data AS $k => $v) {
@@ -31,14 +30,30 @@ class Queue
 			$preparedData = null;
 		}
 
-		self::getQueue()->push($job, $preparedData, $queue, $options);
+		self::getQueue()->push($job, $preparedData, $queue, []);
 	}
 
 	/**
-	 * @return BaseQueue
+	 * @param $job
+	 * @param mixed $delay
+	 * @param array $data
+	 * @param string $queue
 	 */
-	private static function getQueue() {
-		return \Yii::$app->queue;
+	public static function pushDelayed($job, $delay, $data = null, $queue = 'default') {
+		$preparedData = [];
+		if (is_array($data)) {
+			foreach ($data AS $k => $v) {
+				if (is_object($v)) {
+					$preparedData[$k] = serialize($v);
+				} else {
+					$preparedData[$k] = $v;
+				}
+			}
+		} else {
+			$preparedData = null;
+		}
+
+		self::getQueue()->pushDelayed($job, $delay, $preparedData, $queue, []);
 	}
 
 	/**
@@ -47,5 +62,12 @@ class Queue
 	 */
 	public static function pop($queueName = 'default') {
 		return self::getQueue()->pop($queueName);
+	}
+
+	/**
+	 * @return BaseQueue
+	 */
+	private static function getQueue() {
+		return \Yii::$app->queue;
 	}
 }

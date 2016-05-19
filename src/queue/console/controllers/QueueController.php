@@ -26,30 +26,89 @@ use yii\redis\Connection;
 class QueueController extends Controller
 {
 	public static $TAG = __CLASS__;
+	private static $queue = null;
+	/**
+	 * @var int Queue listen sleeping time
+	 */
 	public $sleep = 1;
+	/**
+	 * @var int Tries count before job will stored to failed or flushed
+	 */
 	public $tries = 3;
+	/**
+	 * @var string Queue name
+	 */
 	public $queueName = 'default';
+	/**
+	 * @var string Yii config component name
+	 */
 	public $queueObjectName = 'queue';
+	/**
+	 * @var bool Stores failed jobs to db. See queue/failed-table, queue/failed, queue/failed-flush
+	 */
 	public $storeFailedJobs = false;
-	public $loggingJobs = false;
-
+	/**
+	 * @var int Poll frequency in seconds
+	 */
+	public $poolFreqSeconds = 30;
+	/**
+	 * @var bool
+	 */
+	public $debug = false;
+	/**
+	 * @var bool
+	 */
 	private $working = true;
 
 	public function init() {
 		pcntl_signal(SIGTERM, [$this, 'signalHandler']);
 		pcntl_signal_dispatch();
 		parent::init();
+		if (self::$queue === null) {
+			self::$queue = Yii::$app->{$this->queueObjectName};
+		}
+
 	}
 
 	public function beforeAction($action) {
 		if ($this->storeFailedJobs === 'true' || $this->storeFailedJobs === '1') {
 			$this->storeFailedJobs = true;
 		}
-
-		if ($this->loggingJobs === 'true' || $this->loggingJobs === '1') {
-			$this->loggingJobs = true;
-		}
 		return parent::beforeAction($action);
+	}
+
+	public function options($actionID) {
+		$options = [
+			'listen-delayed' => [
+				'poolFreqSeconds',
+				'debug',
+			],
+			'listen'         => [
+				'sleep',
+				'tries',
+				'queueName',
+				'queueObjectName',
+				'storeFailedJobs',
+				'debug'
+			],
+			'work'           => [
+				'tries',
+				'queueName',
+				'queueObjectName',
+				'storeFailedJobs',
+				'debug'
+			],
+		];
+		$parent = parent::options($actionID);
+
+		return array_merge($parent, ($options[$actionID] ?? []));
+	}
+
+	/**
+	 * Handles last delayed jobs
+	 */
+	public function actionDelayed() {
+		$this->processDelayed();
 	}
 
 	/**
@@ -65,14 +124,6 @@ class QueueController extends Controller
 			$this->getQueue()->push($item->class, $payload->getParams(), $this->queueName);
 			$item->delete();
 		}
-	}
-
-	/**
-	 * @return BaseQueue
-	 */
-	private function getQueue()
-	{
-		return Yii::$app->{$this->queueObjectName};
 	}
 
 	/**
@@ -104,121 +155,32 @@ class QueueController extends Controller
 	public function actionListen() {
 		while ($this->working) {
 			$cmd = $this->buildWorkerCommand();
-			echo exec($cmd, $out);
-			echo implode(PHP_EOL, $out);
+			$out = shell_exec($cmd);
+			if ($this->debug && $out !== '' && $out !== null) {
+				$this->stdout($out . PHP_EOL);
+			}
 			sleep($this->sleep);
 		}
 	}
 
 	/**
-	 * @param string $actionName
-	 * @return string
+	 * Handle all delayed jobs in infinite loop
 	 */
-	private function buildWorkerCommand($actionName = 'work')
-	{
-		$cmd = [];
-		$cmd[] = PHP_BINARY;
-		$cmd[] = Yii::$app->basePath . '/../yii queue/' . $actionName;
-		$params = [];
-		foreach ($this->options(null) AS $option) {
-			if (in_array($option, parent::options(null))) continue;
-			$params['--' . $option] = $this->$option;
+	public function actionListenDelayed() {
+		if ($this->poolFreqSeconds < 0) {
+			$this->poolFreqSeconds = 1;
 		}
 
-		$out = implode(' ', $cmd) . ' ';
-		foreach ($params AS $k => $v) {
-			$out .= $k . '=' . $v;
-			$out .= ' ';
-		}
-
-		return $out;
-	}
-
-	public function options($actionID)
-	{
-		return array_merge(parent::options($actionID), [
-			'tries', 'sleep', 'queueName', 'queueObjectName', 'storeFailedJobs'
-		]);
-	}
-
-	public function actionTail($lastRowsCount = 10) {
-
-	}
-
-	/**
-	 * Process a job
-	 *
-	 * @throws \Exception
-	 */
-	public function actionWork() {
-		$this->process();
-	}
-
-	/**
-	 * @return bool
-	 * @throws \Exception
-	 */
-	protected function process() {
-		/** @var BaseQueue $queue */
-		$queue = $this->getQueue();
-		/** @var Job $job */
-		$job = $queue->pop($this->queueName);
-
-		if ($job instanceof Job) {
-			try {
-				$job->run();
-				return true;
-			} catch (\Exception $e) {
-				if ((int)$this->tries === 0) {
-					throw $e;
-				}
-				
-				$payload = $job->getPayload();
-
-				if ($payload->getParams() === null) {
-					$payload->setParams([]);
-				}
-
-				$workedTries = $payload->getParam('tries', 0);
-				if (!$payload->hasParam('tries')) {
-					$payload->setParam('tries', 0);
-				}
-
-				if ($workedTries < $this->tries) {
-					Yii::info("Error executing job. \nData: " . VarDumper::export($payload->getParams()) . "\nTRY #" . $workedTries . PHP_EOL, self::$TAG);
-					$queue->push($payload->getClass(), $payload->getParams(), $job->getQueueName());
-					if ($this->storeFailedJobs) {
-						$this->storeFailed($payload->getClass(), $payload->getParam('tries'), $payload, $e);
-					}
-				} else {
-					throw $e;
-				}
-
-				throw $e;
-			}
-		}
-		return false;
-	}
-
-	/**
-	 * @param string $className
-	 * @param int $tries
-	 * @param QueuePayload $payload
-	 * @param \Exception $exception
-	 * @throws \yii\db\Exception
-	 */
-	private function storeFailed($className, $tries, QueuePayload $payload, \Exception $exception) {
-		try {
-			FailedJobs::add($className, $tries, $payload, $exception);
-		} catch (Exception $ex) {
-			throw new \yii\db\Exception('Table failed_jobs not created. Please, run: queue/table-failed');
+		while ($this->working) {
+			$this->actionDelayed();
+			sleep($this->poolFreqSeconds);
 		}
 	}
 
-	public function actionMonitor($q = 'queue:default', $showJobs = false)
-	{
-		/** @var Connection $q */
+	public function actionMonitor($q = 'queue:default', $showJobs = false) {
+		/** @var Connection $redis */
 		$redis = Yii::$app->redis;
+		$queue = Yii::$app->queue;
 
 		$up = function (int $times = 1) {
 			for ($i = 0; $i < $times; $i++) {
@@ -230,10 +192,12 @@ class QueueController extends Controller
 
 		while ($this->working) {
 			$result = $redis->lrange($q, 0, -1);
+			$delayedCnt = (int)$redis->llen($queue->delayedQueuePrefix);
 
 			$out = [
-				'jobs' => [],
+				'jobs'      => [],
 				'countJobs' => sizeof($result),
+				'delayed'   => $delayedCnt,
 			];
 
 			if ($showJobs) {
@@ -266,8 +230,142 @@ class QueueController extends Controller
 		}
 	}
 
-	private function signalHandler($signo)
-	{
+	/**
+	 * Process a job
+	 *
+	 * @throws \Exception
+	 */
+	public function actionWork() {
+		$this->process();
+	}
+
+	/**
+	 * @return bool
+	 * @throws \Exception
+	 */
+	protected function process() {
+		/** @var BaseQueue $queue */
+		$queue = $this->getQueue();
+		/** @var Job $job */
+		$job = $queue->pop($this->queueName);
+
+		if ($job instanceof Job) {
+			try {
+				$job->run();
+				return true;
+			} catch (\Exception $e) {
+				if ((int)$this->tries === 0) {
+					throw $e;
+				}
+
+				$payload = $job->getPayload();
+
+				if ($payload->getParams() === null) {
+					$payload->setParams([]);
+				}
+
+				$workedTries = $payload->getParam('tries', 0);
+				if (!$payload->hasParam('tries')) {
+					$payload->setParam('tries', 0);
+				}
+
+				if ($workedTries < $this->tries) {
+					$msg = "Error executing job. \nData: " . VarDumper::export($payload->getParams()) . "\nTRY #" . $workedTries . PHP_EOL;
+					if ($this->debug) {
+						echo $msg;
+					}
+					Yii::warning($msg, self::$TAG);
+					$queue->push($payload->getClass(), $payload->getParams(), $job->getQueueName());
+					if ($this->storeFailedJobs) {
+						$this->storeFailed($payload->getClass(), $payload->getParam('tries'), $payload, $e);
+					}
+				} else {
+					throw $e;
+				}
+
+				throw $e;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * @return int Count of pushed jobs
+	 */
+	protected function processDelayed() {
+		/** @var BaseQueue $queue */
+		$queue = self::$queue;
+		$sent = 0;
+
+		foreach ($queue->getDelayedList() AS $delayedJob) {
+			/** @var Job $delayedJob */
+
+			if ($this->debug) {
+				echo "Job time: " . $delayedJob->getPayload()->getDelayTime() . ': now time ' . time() . "\n";
+			}
+			if ((int)$delayedJob->getPayload()->getDelayTime() <= time()) {
+				echo "Delayed job is out of time at " . (time() - (int)$delayedJob->getPayload()->getDelayTime()) . " seconds\n";
+				$job = $queue->pop($queue->delayedQueuePrefix, true);
+				if ($job instanceof Job) {
+					$queue->pushJob($job, $delayedJob->getPayload());
+					$sent++;
+				} else {
+					$this->stderr("But RPOP returned NULL ({$queue->delayedQueuePrefix})", Console::FG_RED);
+				}
+
+			}
+		}
+
+		return $sent;
+	}
+
+	/**
+	 * @return BaseQueue
+	 */
+	private function getQueue() {
+		return Yii::$app->{$this->queueObjectName};
+	}
+
+	/**
+	 * @param string $actionName
+	 * @return string
+	 */
+	private function buildWorkerCommand($actionName = 'work') {
+		$cmd = [];
+		$cmd[] = PHP_BINARY;
+		$cmd[] = Yii::$app->basePath . '/../yii queue/' . $actionName;
+		$params = [];
+
+		foreach ($this->options($actionName) AS $option) {
+			if (in_array($option, parent::options(null))) continue;
+			$params['--' . $option] = $this->$option;
+		}
+
+		$out = implode(' ', $cmd) . ' ';
+		foreach ($params AS $k => $v) {
+			$out .= $k . '=' . $v;
+			$out .= ' ';
+		}
+
+		return $out;
+	}
+
+	/**
+	 * @param string $className
+	 * @param int $tries
+	 * @param QueuePayload $payload
+	 * @param \Exception $exception
+	 * @throws \yii\db\Exception
+	 */
+	private function storeFailed($className, $tries, QueuePayload $payload, \Exception $exception) {
+		try {
+			FailedJobs::add($className, $tries, $payload, $exception);
+		} catch (Exception $ex) {
+			throw new \yii\db\Exception('Table failed_jobs not created. Please, run: queue/table-failed');
+		}
+	}
+
+	private function signalHandler($signo) {
 		$this->working = false;
 		Yii::info('SIGTERM received', __METHOD__);
 	}

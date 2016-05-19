@@ -33,8 +33,38 @@ class Job
 	public function __construct($queueObject, $payload, $queueName) {
 		$this->queueObject = $queueObject;
 		$decoded = json_decode($payload);
-		$this->payload = new QueuePayload($decoded->id, $decoded->job, (array)$decoded->data);
+		$delay = isset($decoded->time) ? $decoded->time : -1;
+		$queueName = isset($payload->queue) ? $payload->queue : 'default';
+		$this->payload = new QueuePayload($decoded->id, $decoded->job, (array)$decoded->data, $delay, $queueName);
 		$this->queueName = $queueName;
+	}
+
+	/**
+	 * @return string Serialized payload object
+	 */
+	public function getEncodedPayload() {
+		return serialize($this->getPayload());
+	}
+
+	/**
+	 * @return QueuePayload
+	 */
+	public function getPayload() {
+		return $this->payload;
+	}
+
+	/**
+	 * @return string
+	 */
+	public function getQueueName() {
+		return $this->queueName;
+	}
+
+	/**
+	 * @return string
+	 */
+	public function getQueueObject() {
+		return $this->queueObject;
 	}
 
 	public function run() {
@@ -58,7 +88,7 @@ class Job
 		}
 
 		try {
-			if ($instance instanceof QueueHandler) {
+			if ($instance instanceof QueueWorker) {
 				$instance->run($this, $payload->getParams());
 			} else {
 				call_user_func([$instance, $method], $this, $payload->getParams());
@@ -84,33 +114,5 @@ class Job
 	protected function resolveJob($job) {
 		$segments = explode('@', $job);
 		return count($segments) > 1 ? $segments : [$segments[0], 'run'];
-	}
-
-	/**
-	 * @return string
-	 */
-	public function getQueueObject() {
-		return $this->queueObject;
-	}
-
-	/**
-	 * @return string Serialized payload object
-	 */
-	public function getEncodedPayload() {
-		return serialize($this->getPayload());
-	}
-
-	/**
-	 * @return QueuePayload
-	 */
-	public function getPayload() {
-		return $this->payload;
-	}
-
-	/**
-	 * @return string
-	 */
-	public function getQueueName() {
-		return $this->queueName;
 	}
 }

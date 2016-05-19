@@ -22,22 +22,31 @@ class QueuePayload
 	private $arguments = [];
 
 	/**
+	 * @var int
+	 */
+	private $delayTime = -1;
+
+	private $queue = 'default';
+
+	/**
 	 * QueuePayload constructor.
 	 * @param string $id
 	 * @param string $className
 	 * @param array $arguments
 	 */
-	public function __construct($id, $className, array $arguments) {
+	public function __construct($id, $className, array $arguments, $delayTime = -1, $queue = 'default') {
 		$this->id = $id;
 		$this->className = $className;
 		$this->arguments = $arguments;
+		$this->delayTime = $delayTime;
+		$this->queue = $queue;
 	}
 
 	/**
 	 * @return string
 	 */
-	public function getId() {
-		return $this->id;
+	public function encode() {
+		return base64_encode(serialize($this));
 	}
 
 	/**
@@ -48,29 +57,17 @@ class QueuePayload
 	}
 
 	/**
-	 * @return array
+	 * @return int
 	 */
-	public function getParams() {
-		return $this->arguments;
+	public function getDelayTime() {
+		return $this->delayTime;
 	}
 
 	/**
-	 * @param array $val
+	 * @return string
 	 */
-	public function setParams(array $val) {
-		$this->arguments = $val;
-	}
-
-	/**
-	 * @param string $key
-	 * @param mixed $value
-	 */
-	public function setParam($key, $value) {
-		if (!is_array($this->arguments)) {
-			$this->arguments = [];
-		}
-
-		$this->arguments[$key] = $value;
+	public function getId() {
+		return $this->id;
 	}
 
 	/**
@@ -87,6 +84,20 @@ class QueuePayload
 	}
 
 	/**
+	 * @return array
+	 */
+	public function getParams() {
+		return $this->arguments;
+	}
+
+	/**
+	 * @return string
+	 */
+	public function getQueueName() {
+		return $this->queue;
+	}
+
+	/**
 	 * @param string $key
 	 * @return bool
 	 */
@@ -95,9 +106,21 @@ class QueuePayload
 	}
 
 	/**
-	 * @return string
+	 * @param string $key
+	 * @param mixed $value
 	 */
-	public function encode() {
-		return base64_encode(serialize($this));
+	public function setParam($key, $value) {
+		if (!is_array($this->arguments)) {
+			$this->arguments = [];
+		}
+
+		$this->arguments[$key] = $value;
+	}
+
+	/**
+	 * @param array $val
+	 */
+	public function setParams(array $val) {
+		$this->arguments = $val;
 	}
 }

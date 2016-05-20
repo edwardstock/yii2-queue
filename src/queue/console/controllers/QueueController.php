@@ -96,7 +96,8 @@ class QueueController extends Controller
 				'queueName',
 				'queueObjectName',
 				'storeFailedJobs',
-				'debug'
+				'debug',
+				'sleep',
 			],
 		];
 		$parent = parent::options($actionID);

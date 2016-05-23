@@ -37,22 +37,42 @@ class RedisQueue extends BaseQueue
 		}
 	}
 
-	public function popInternal($queue = null, $delayed = false) {
-		$payload = $this->redis->lpop($delayed ? $this->delayedQueuePrefix : $this->getQueue($queue));
-		if ($payload) {
-			//$this->redis->zadd($queue.':reserved', $this->getTime() + 60, $job);
-			return new Job($this, $payload, $queue);
-		}
-
-		return null;
+	/**
+	 * @param array $criteria
+	 * @return bool
+	 */
+	public function existsDelayed(array $criteria): bool {
+		return sizeof($this->findDelayed($criteria)) > 0;
 	}
 
-	protected function pushInternal($payload, $queue = null, $options = [], $delayed = false) {
-		$qName = $delayed ? $this->delayedQueuePrefix : $this->getQueue($queue);
-		$this->redis->rpush($qName, $payload);
-		$payload = json_decode($payload, true);
+	/**
+	 * @param array $criteria
+	 * @return Job[]
+	 */
+	public function findDelayed(array $criteria): array {
+		if (sizeof($criteria) === 0) {
+			return [];
+		}
 
-		return $payload['id'];
+		$search = [];
+		$where = $this->buildPlainArray($criteria);
+
+		$reqComp = sizeof($where);
+		foreach ($this->getDelayedList() AS $job) {
+			$plainPayload = $this->buildPlainArray($job->getPayload()->getParams());
+			$comp = 0;
+			foreach ($where AS $wKey => $wVal) {
+				if (isset($plainPayload[$wKey]) && $plainPayload[$wKey] === $wVal) {
+					$comp++;
+				}
+			}
+
+			if ($comp === $reqComp) {
+				$search[] = $job;
+			}
+		}
+
+		return $search;
 	}
 
 	/**
@@ -65,5 +85,86 @@ class RedisQueue extends BaseQueue
 			$dec = Json::decode($payload);
 			yield new Job($this, $payload, $dec['queue']);
 		}
+	}
+
+	/**
+	 * @param string|null $queue
+	 * @param bool $delayed
+	 * @return Job|null
+	 */
+	public function popInternal($queue = null, $delayed = false) {
+		$payload = $this->redis->lpop($delayed ? $this->delayedQueuePrefix : $this->getQueue($queue));
+		if ($payload) {
+			//$this->redis->zadd($queue.':reserved', $this->getTime() + 60, $job);
+			return new Job($this, $payload, $queue);
+		}
+
+		return null;
+	}
+
+	/**
+	 * @param array $payload
+	 * @param null $queue
+	 * @param array $options
+	 * @param bool $delayed
+	 * @return null
+	 */
+	protected function pushInternal($payload, $queue = null, $options = [], $delayed = false) {
+		$decoded = Json::decode($payload);
+		$data = $decoded['data'] ?? [];
+
+		if ($decoded['unique'] && $this->existsDelayed($data)) {
+			return null;
+		}
+		$qName = $delayed ? $this->delayedQueuePrefix : $this->getQueue($queue);
+		$this->redis->rpush($qName, $payload);
+		$payload = json_decode($payload, true);
+
+		return $payload['id'];
+	}
+
+	/**
+	 * @param \stdClass|string|array $data
+	 * @return array
+	 */
+	private function buildPlainArray($data) {
+		$out = [];
+		$recForm = function ($value, $level = 0, $prevName = null) use (&$recForm, &$out) {
+			foreach ($value AS $n => $v) {
+				if (is_object($v)) {
+					$nextName = $prevName . $n;
+
+					if ($level >= 1) {
+						$nextName = $prevName . ".{$n}";
+					}
+
+					$res = $recForm($v, $level + 1, $nextName);
+					if ($res !== null) {
+						$out[$nextName] = $res;
+					}
+				} else {
+					if ($level === 1) {
+						$name = $prevName !== null ? "{$prevName}.{$n}" : $n;
+					} else if ($level > 1) {
+						$name = "{$prevName}.{$n}";
+					} else {
+						$name = $n;
+					}
+					$out[$name] = $v;
+				}
+			}
+		};
+
+		if (is_object($data)) {
+			$procData = $data;
+		} else if (is_string($data)) {
+			$procData = Json::decode($data, false);
+		} else {
+			$procData = Json::decode(Json::encode($data), false);
+		}
+
+		$recForm($procData);
+
+		return $out;
 	}
 } 

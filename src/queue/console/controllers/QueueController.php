@@ -52,6 +52,10 @@ class QueueController extends Controller
 	 */
 	public $poolFreqSeconds = 30;
 	/**
+	 * @var float Count seconds between transfer tasks from delayed queue to your queue
+	 */
+	public $poolGapSeconds = 0;
+	/**
 	 * @var bool
 	 */
 	public $debug = false;
@@ -75,34 +79,6 @@ class QueueController extends Controller
 			$this->storeFailedJobs = true;
 		}
 		return parent::beforeAction($action);
-	}
-
-	public function options($actionID) {
-		$options = [
-			'listen-delayed' => [
-				'poolFreqSeconds',
-				'debug',
-			],
-			'listen'         => [
-				'sleep',
-				'tries',
-				'queueName',
-				'queueObjectName',
-				'storeFailedJobs',
-				'debug'
-			],
-			'work'           => [
-				'tries',
-				'queueName',
-				'queueObjectName',
-				'storeFailedJobs',
-				'debug',
-				'sleep',
-			],
-		];
-		$parent = parent::options($actionID);
-
-		return array_merge($parent, ($options[$actionID] ?? []));
 	}
 
 	/**
@@ -240,6 +216,35 @@ class QueueController extends Controller
 		$this->process();
 	}
 
+	public function options($actionID) {
+		$options = [
+			'listen-delayed' => [
+				'poolFreqSeconds',
+				'poolGapSeconds',
+				'debug',
+			],
+			'listen'         => [
+				'sleep',
+				'tries',
+				'queueName',
+				'queueObjectName',
+				'storeFailedJobs',
+				'debug'
+			],
+			'work'           => [
+				'tries',
+				'queueName',
+				'queueObjectName',
+				'storeFailedJobs',
+				'debug',
+				'sleep',
+			],
+		];
+		$parent = parent::options($actionID);
+
+		return array_merge($parent, ($options[$actionID] ?? []));
+	}
+
 	/**
 	 * @return bool
 	 * @throws \Exception
@@ -315,7 +320,10 @@ class QueueController extends Controller
 				} else {
 					$this->stderr("But RPOP returned NULL ({$queue->delayedQueuePrefix})", Console::FG_RED);
 				}
+			}
 
+			if ($this->poolGapSeconds > 0) {
+				usleep($this->poolGapSeconds * 1000000);
 			}
 		}
 

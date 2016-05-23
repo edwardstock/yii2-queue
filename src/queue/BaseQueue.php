@@ -30,6 +30,16 @@ abstract class BaseQueue extends Component
 	abstract public function getDelayedList();
 
 	/**
+	 * Class-specific realisation of getting the job to the queue
+	 *
+	 * @param string|null $queue Queue name
+	 *
+	 * @param bool $delayed
+	 * @return mixed
+	 */
+	abstract protected function popInternal($queue = null, $delayed = false);
+
+	/**
 	 * Class-specific realisation of adding the job to the queue
 	 *
 	 * @param array $payload Job data
@@ -40,16 +50,6 @@ abstract class BaseQueue extends Component
 	 * @return mixed
 	 */
 	abstract protected function pushInternal($payload, $queue = null, $options = [], $delayed = false);
-
-	/**
-	 * Class-specific realisation of getting the job to the queue
-	 *
-	 * @param string|null $queue Queue name
-	 *
-	 * @param bool $delayed
-	 * @return mixed
-	 */
-	abstract protected function popInternal($queue = null, $delayed = false);
 
 	/**
 	 * Builds queue prefix
@@ -83,7 +83,6 @@ abstract class BaseQueue extends Component
 		return $this->delayedQueuePrefix . ':' . $name;
 	}
 
-
 	/**
 	 * Get job from the queue
 	 *
@@ -113,12 +112,12 @@ abstract class BaseQueue extends Component
 	 * @param mixed $delay integer timestamp or string supported by \DateTime. For example: +3 hours, +1 week
 	 * @param null $data
 	 * @param null $queue
-	 * @param $options
+	 * @param bool $unique
 	 * @return mixed
 	 */
-	public function pushDelayed($job, $delay, $data = null, $queue = null) {
+	public function pushDelayed($job, $delay, $data = null, $queue = null, $unique = false) {
 		return $this->pushInternal(
-			$this->createPayloadDelayed($job, $data, $delay, $queue),
+			$this->createPayloadDelayed($job, $data, $delay, $queue, $unique),
 			$queue,
 			[],
 			true
@@ -155,39 +154,14 @@ abstract class BaseQueue extends Component
 	 *
 	 * @param string $job Fully qualified class name of the job
 	 * @param mixed $data Data for the job
+	 * @param bool $unique
 	 * @return array
 	 */
-	protected function createPayload($job, $data) {
+	protected function createPayload($job, $data, $unique = false) {
 		$payload = [
-			'job'  => $job,
-			'data' => $data
-		];
-		$payload = $this->setMeta($payload, 'id', $this->getRandomId());
-
-		return $payload;
-	}
-
-	/**
-	 * @param $job
-	 * @param $data
-	 * @param $delayTime
-	 * @param null $queue
-	 * @return array|string
-	 */
-	protected function createPayloadDelayed($job, $data, $delayTime, $queue = null) {
-		if (is_int($delayTime) || is_numeric($delayTime)) {
-			$time = (int)$delayTime;
-		} else if ($delayTime instanceof \DateTime) {
-			$time = $delayTime->getTimestamp();
-		} else {
-			$time = (int)(new \DateTime($delayTime))->getTimestamp();
-		}
-
-		$payload = [
-			'job'   => $job,
-			'data'  => $data,
-			'time'  => $time,
-			'queue' => $queue ?? 'default',
+			'job'    => $job,
+			'data'   => $data,
+			'unique' => $unique,
 		];
 		$payload = $this->setMeta($payload, 'id', $this->getRandomId());
 
@@ -218,9 +192,38 @@ abstract class BaseQueue extends Component
 	}
 
 	/**
+	 * @param $job
+	 * @param $data
+	 * @param $delayTime
+	 * @param null $queue
+	 * @param bool $unique
+	 * @return array|string
+	 */
+	protected function createPayloadDelayed($job, $data, $delayTime, $queue = null, $unique = false) {
+		if (is_int($delayTime) || is_numeric($delayTime)) {
+			$time = (int)$delayTime;
+		} else if ($delayTime instanceof \DateTime) {
+			$time = $delayTime->getTimestamp();
+		} else {
+			$time = (int)(new \DateTime($delayTime))->getTimestamp();
+		}
+
+		$payload = [
+			'job'    => $job,
+			'data'   => $data,
+			'time'   => $time,
+			'queue'  => $queue ?? 'default',
+			'unique' => $unique,
+		];
+		$payload = $this->setMeta($payload, 'id', $this->getRandomId());
+
+		return $payload;
+	}
+
+	/**
 	 * Get prefixed queue name
 	 *
-	 * @param $queue BaseQueue name
+	 * @param string $queue BaseQueue name
 	 * @return string
 	 */
 	protected function getQueue($queue) {

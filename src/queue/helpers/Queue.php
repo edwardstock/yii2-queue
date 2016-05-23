@@ -85,6 +85,11 @@ class Queue
 		}
 	}
 
+	/**
+	 * @param $job
+	 * @param null $data
+	 * @param string $queue
+	 */
 	public static function pushUnique($job, $data = null, $queue = 'default') {
 		$preparedData = [];
 		if (is_array($data)) {

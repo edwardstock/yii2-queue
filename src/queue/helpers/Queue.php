@@ -17,6 +17,7 @@ class Queue
 	 * @param string $job Class name of job handler. Class must implements QueueHandler
 	 * @param null $data
 	 * @param string $queue
+	 * 
 	 */
 	public static function push($job, $data = null, $queue = 'default') {
 		$preparedData = [];

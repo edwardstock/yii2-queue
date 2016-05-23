@@ -11,6 +11,8 @@ use atlasmobile\queue\Job;
 class Queue
 {
 
+	private static $sent = [];
+
 	/**
 	 * @param string $job Class name of job handler. Class must implements QueueHandler
 	 * @param null $data
@@ -53,7 +55,55 @@ class Queue
 			$preparedData = null;
 		}
 
-		self::getQueue()->pushDelayed($job, $delay, $preparedData, $queue, []);
+		self::getQueue()->pushDelayed($job, $delay, $preparedData, $queue);
+	}
+
+	/**
+	 * @param $job
+	 * @param $delay
+	 * @param null $data
+	 * @param string $queue
+	 */
+	public static function pushDelayedUnique($job, $delay, $data = null, $queue = 'default') {
+		$preparedData = [];
+		if (is_array($data)) {
+			foreach ($data AS $k => $v) {
+				if (is_object($v)) {
+					$preparedData[$k] = serialize($v);
+				} else {
+					$preparedData[$k] = $v;
+				}
+			}
+		} else {
+			$preparedData = null;
+		}
+
+		$crc = crc32(json_encode([$job, $delay, $data, $queue]));
+		if (!isset(self::$sent[$crc])) {
+			self::getQueue()->pushDelayed($job, $delay, $preparedData, $queue);
+			self::$sent[$crc] = true;
+		}
+	}
+
+	public static function pushUnique($job, $data = null, $queue = 'default') {
+		$preparedData = [];
+		if (is_array($data)) {
+			foreach ($data AS $k => $v) {
+				if (is_object($v)) {
+					$preparedData[$k] = serialize($v);
+				} else {
+					$preparedData[$k] = $v;
+				}
+			}
+		} else {
+			$preparedData = null;
+		}
+
+		$crc = crc32(json_encode([$job, $data, $queue]));
+		if (!isset(self::$sent[$crc])) {
+			self::getQueue()->push($job, $preparedData, $queue, []);
+			self::$sent[$crc] = true;
+		}
 	}
 
 	/**

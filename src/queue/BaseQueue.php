@@ -11,6 +11,9 @@ use const false;
  */
 abstract class BaseQueue extends Component
 {
+	const DS_SQL = 'sql';
+	const DS_REDIS = 'redis';
+
 	/**
 	 * @var string Queue prefix
 	 */
@@ -125,14 +128,9 @@ abstract class BaseQueue extends Component
 	}
 
 	/**
-	 * @param Job $job
 	 * @param QueuePayload $payload
 	 */
-	public function pushJob(Job $job, QueuePayload $payload = null) {
-		if ($payload === null) {
-			$payload = $job->getPayload();
-		}
-
+	public function pushJob(QueuePayload $payload) {
 		$this->push($payload->getClass(), $payload->getParams(), $payload->getQueueName() ?? 'default');
 	}
 

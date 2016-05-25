@@ -4,6 +4,7 @@ declare(ticks = 1);
 
 use atlasmobile\queue\BaseQueue;
 use atlasmobile\queue\Job;
+use atlasmobile\queue\models\Delayed;
 use atlasmobile\queue\models\FailedJobs;
 use atlasmobile\queue\QueuePayload;
 use Yii;
@@ -71,7 +72,6 @@ class QueueController extends Controller
 		if (self::$queue === null) {
 			self::$queue = Yii::$app->{$this->queueObjectName};
 		}
-
 	}
 
 	public function beforeAction($action) {
@@ -81,11 +81,58 @@ class QueueController extends Controller
 		return parent::beforeAction($action);
 	}
 
+	public function options($actionID) {
+		$options = [
+			'delayed'        => [
+				'debug',
+			],
+			'listen-delayed' => [
+				'poolFreqSeconds',
+				'poolGapSeconds',
+				'debug',
+			],
+			'listen'         => [
+				'sleep',
+				'tries',
+				'queueName',
+				'queueObjectName',
+				'storeFailedJobs',
+				'debug'
+			],
+			'work'           => [
+				'tries',
+				'queueName',
+				'queueObjectName',
+				'storeFailedJobs',
+				'debug',
+				'sleep',
+			],
+		];
+		$parent = parent::options($actionID);
+
+		return array_merge($parent, ($options[$actionID] ?? []));
+	}
+
 	/**
 	 * Handles last delayed jobs
 	 */
 	public function actionDelayed() {
 		$this->processDelayed();
+	}
+
+	/**
+	 * Creates table with delayed tasks
+	 */
+	public function actionDelayedTable() {
+		$this->run('migrate/up', [
+			'migrationPath' => '@vendor/atlasmobile/yii2-queue/src/queue/migrations/delayed'
+		]);
+	}
+
+	public function actionDelayedTableDrop() {
+		$this->run('migrate/down', [
+			'migrationPath' => '@vendor/atlasmobile/yii2-queue/src/queue/migrations/delayed'
+		]);
 	}
 
 	/**
@@ -119,7 +166,7 @@ class QueueController extends Controller
 	 */
 	public function actionFailedTable() {
 		$this->run('migrate/up', [
-			'migrationPath' => '@vendor/atlasmobile/yii2-queue/src/queue/migrations'
+			'migrationPath' => '@vendor/atlasmobile/yii2-queue/src/queue/migrations/failed'
 		]);
 	}
 
@@ -169,7 +216,7 @@ class QueueController extends Controller
 
 		while ($this->working) {
 			$result = $redis->lrange($q, 0, -1);
-			$delayedCnt = (int)$redis->llen($queue->delayedQueuePrefix);
+			$delayedCnt = (int)Delayed::find()->count();
 
 			$out = [
 				'jobs'      => [],
@@ -214,35 +261,6 @@ class QueueController extends Controller
 	 */
 	public function actionWork() {
 		$this->process();
-	}
-
-	public function options($actionID) {
-		$options = [
-			'listen-delayed' => [
-				'poolFreqSeconds',
-				'poolGapSeconds',
-				'debug',
-			],
-			'listen'         => [
-				'sleep',
-				'tries',
-				'queueName',
-				'queueObjectName',
-				'storeFailedJobs',
-				'debug'
-			],
-			'work'           => [
-				'tries',
-				'queueName',
-				'queueObjectName',
-				'storeFailedJobs',
-				'debug',
-				'sleep',
-			],
-		];
-		$parent = parent::options($actionID);
-
-		return array_merge($parent, ($options[$actionID] ?? []));
 	}
 
 	/**
@@ -307,15 +325,14 @@ class QueueController extends Controller
 
 		foreach ($queue->getDelayedList() AS $delayedJob) {
 			/** @var Job $delayedJob */
-
 			if ($this->debug) {
 				echo "Job time: " . $delayedJob->getPayload()->getDelayTime() . ': now time ' . time() . "\n";
 			}
 			if ((int)$delayedJob->getPayload()->getDelayTime() <= time()) {
 				echo "Delayed job is out of time at " . (time() - (int)$delayedJob->getPayload()->getDelayTime()) . " seconds\n";
-				$job = $queue->pop($queue->delayedQueuePrefix, true);
-				if ($job instanceof Job) {
-					$queue->pushJob($job, $delayedJob->getPayload());
+				$job = Delayed::pop($delayedJob->getPayload()->getId());
+				if ($job !== null) {
+					$queue->pushJob($delayedJob->getPayload());
 					$sent++;
 				} else {
 					$this->stderr("But RPOP returned NULL ({$queue->delayedQueuePrefix})", Console::FG_RED);

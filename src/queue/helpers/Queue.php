@@ -10,9 +10,6 @@ use atlasmobile\queue\Job;
  */
 class Queue
 {
-
-	private static $sent = [];
-
 	/**
 	 * @param string $job Class name of job handler. Class must implements QueueHandler
 	 * @param null $data

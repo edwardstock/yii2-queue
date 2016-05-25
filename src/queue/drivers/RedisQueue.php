@@ -4,6 +4,7 @@ namespace atlasmobile\queue\drivers;
 
 use atlasmobile\queue\BaseQueue;
 use atlasmobile\queue\Job;
+use atlasmobile\queue\models\Delayed;
 use Yii;
 use yii\base\InvalidConfigException;
 use yii\helpers\Json;
@@ -38,52 +39,13 @@ class RedisQueue extends BaseQueue
 	}
 
 	/**
-	 * @param array $criteria
-	 * @return bool
-	 */
-	public function existsDelayed(array $criteria): bool {
-		return sizeof($this->findDelayed($criteria)) > 0;
-	}
-
-	/**
-	 * @param array $criteria
-	 * @return Job[]
-	 */
-	public function findDelayed(array $criteria): array {
-		if (sizeof($criteria) === 0) {
-			return [];
-		}
-
-		$search = [];
-		$where = $this->buildPlainArray($criteria);
-
-		$reqComp = sizeof($where);
-		foreach ($this->getDelayedList() AS $job) {
-			$plainPayload = $this->buildPlainArray($job->getPayload()->getParams());
-			$comp = 0;
-			foreach ($where AS $wKey => $wVal) {
-				if (isset($plainPayload[$wKey]) && $plainPayload[$wKey] === $wVal) {
-					$comp++;
-				}
-			}
-
-			if ($comp === $reqComp) {
-				$search[] = $job;
-			}
-		}
-
-		return $search;
-	}
-
-	/**
 	 * @return \Generator|Job[]
 	 */
 	public function getDelayedList() {
-		$list = $this->redis->lrange($this->delayedQueuePrefix, 0, -1);
+		$list = Delayed::getReady();
 
 		foreach ($list AS $payload) {
-			$dec = Json::decode($payload);
-			yield new Job($this, $payload, $dec['queue']);
+			yield new Job($this, $payload->getPayloadAttributes(), $payload->queue);
 		}
 	}
 
@@ -93,9 +55,8 @@ class RedisQueue extends BaseQueue
 	 * @return Job|null
 	 */
 	public function popInternal($queue = null, $delayed = false) {
-		$payload = $this->redis->lpop($delayed ? $this->delayedQueuePrefix : $this->getQueue($queue));
+		$payload = $this->redis->lpop($this->getQueue($queue));
 		if ($payload) {
-			//$this->redis->zadd($queue.':reserved', $this->getTime() + 60, $job);
 			return new Job($this, $payload, $queue);
 		}
 
@@ -116,11 +77,44 @@ class RedisQueue extends BaseQueue
 		if ($decoded['unique'] && $this->existsDelayed($data)) {
 			return null;
 		}
-		$qName = $delayed ? $this->delayedQueuePrefix : $this->getQueue($queue);
-		$this->redis->rpush($qName, $payload);
-		$payload = json_decode($payload, true);
 
-		return $payload['id'];
+		if ($delayed) {
+			$delayedJob = Delayed::push($decoded);
+			return $delayedJob->id;
+		} else {
+			$qName = $delayed ? $this->delayedQueuePrefix : $this->getQueue($queue);
+			$this->redis->rpush($qName, $payload);
+			$payload = json_decode($payload, true);
+
+			return $payload['id'];
+		}
+	}
+
+	/**
+	 * @param array $criteria
+	 * @return bool
+	 */
+	public function existsDelayed(array $criteria): bool {
+		return Delayed::existsByPlainData($this->buildPlainArray($criteria));
+	}
+
+	/**
+	 * @param array $criteria
+	 * @return Job[]
+	 */
+	public function findDelayed(array $criteria): array {
+		if (sizeof($criteria) === 0) {
+			return [];
+		}
+
+		$search = [];
+		$where = $this->buildPlainArray($criteria);
+		foreach (Delayed::findByPlainData($where)->all() AS $payload) {
+			/** @var Delayed $payload */
+			$search[] = new Job($this, $payload->getPayloadAttributes(), $payload->queue);
+		}
+
+		return $search;
 	}
 
 	/**

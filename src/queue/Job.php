@@ -27,10 +27,14 @@ class Job
 	/**
 	 * Job constructor.
 	 * @param string $queueObject
-	 * @param string $payload
+	 * @param string|array $payload
 	 * @param string $queueName
 	 */
 	public function __construct($queueObject, $payload, $queueName) {
+//		var_dump($payload);exit;
+		if (is_array($payload)) {
+			$payload = json_encode($payload);
+		}
 		$this->queueObject = $queueObject;
 		$decoded = json_decode($payload);
 		$delay = isset($decoded->time) ? $decoded->time : -1;

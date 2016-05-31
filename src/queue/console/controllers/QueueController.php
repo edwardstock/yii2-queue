@@ -57,7 +57,11 @@ class QueueController extends Controller
 	 */
 	public $poolGapSeconds = 0;
 	/**
-	 * @var bool
+	 * @var bool Run monitor not in loop
+	 */
+	public $capture = false;
+	/**
+	 * @var bool Verbose stdout and stderr
 	 */
 	public $debug = false;
 	/**
@@ -81,38 +85,6 @@ class QueueController extends Controller
 		return parent::beforeAction($action);
 	}
 
-	public function options($actionID) {
-		$options = [
-			'delayed'        => [
-				'debug',
-			],
-			'listen-delayed' => [
-				'poolFreqSeconds',
-				'poolGapSeconds',
-				'debug',
-			],
-			'listen'         => [
-				'sleep',
-				'tries',
-				'queueName',
-				'queueObjectName',
-				'storeFailedJobs',
-				'debug'
-			],
-			'work'           => [
-				'tries',
-				'queueName',
-				'queueObjectName',
-				'storeFailedJobs',
-				'debug',
-				'sleep',
-			],
-		];
-		$parent = parent::options($actionID);
-
-		return array_merge($parent, ($options[$actionID] ?? []));
-	}
-
 	/**
 	 * Handles last delayed jobs
 	 */
@@ -125,12 +97,6 @@ class QueueController extends Controller
 	 */
 	public function actionDelayedTable() {
 		$this->run('migrate/up', [
-			'migrationPath' => '@vendor/atlasmobile/yii2-queue/src/queue/migrations/delayed'
-		]);
-	}
-
-	public function actionDelayedTableDrop() {
-		$this->run('migrate/down', [
 			'migrationPath' => '@vendor/atlasmobile/yii2-queue/src/queue/migrations/delayed'
 		]);
 	}
@@ -201,10 +167,13 @@ class QueueController extends Controller
 		}
 	}
 
+	/**
+	 * @param string $q Queue name or "all" to show all queues
+	 * @param bool $showJobs
+	 */
 	public function actionMonitor($q = 'queue:default', $showJobs = false) {
 		/** @var Connection $redis */
 		$redis = Yii::$app->redis;
-		$queue = Yii::$app->queue;
 
 		$up = function (int $times = 1) {
 			for ($i = 0; $i < $times; $i++) {
@@ -214,44 +183,67 @@ class QueueController extends Controller
 			}
 		};
 
+		$qNames = [];
+		if (strtolower($q) === 'all') {
+			$keys = $redis->keys('*');
+			foreach ($keys AS $kName) {
+				if (strpos($kName, 'queue:') !== false) {
+					$qNames[] = $kName;
+				}
+			}
+		} else {
+			$qNames[] = $q;
+		}
+
 		while ($this->working) {
-			$result = $redis->lrange($q, 0, -1);
-			$delayedCnt = (int)Delayed::find()->count();
 
 			$out = [
-				'jobs'      => [],
-				'countJobs' => sizeof($result),
-				'delayed'   => $delayedCnt,
+				'delayed'      => (int)Delayed::find()->count(),
+				'summaryCount' => 0,
 			];
+			foreach ($qNames AS $queueName) {
+				$result = $redis->lrange($queueName, 0, -1);
 
-			if ($showJobs) {
-				foreach ($result AS $item) {
-					$uItem = Json::decode($item);
-					$className = $uItem['job'];
-					$data = Json::encode($uItem['data'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-					$out['jobs'][] = "{$className}" . " --> " . $data;
-				}
-			} else {
-				$uniqueJobs = [];
-				foreach ($result AS $item) {
-					$uItem = Json::decode($item);
-					$className = $uItem['job'];
-					if (!isset($uniqueJobs[$className])) {
-						$uniqueJobs[$className] = 1;
-					} else {
-						$uniqueJobs[$className]++;
+				$out[$queueName] = [
+					'countJobs' => sizeof($result),
+					'jobs'      => [],
+				];
+
+				if ($showJobs) {
+					foreach ($result AS $item) {
+						$uItem = Json::decode($item);
+						$className = $uItem['job'];
+						$data = Json::encode($uItem['data'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+						$out[$queueName]['jobs'][] = "{$className}" . " --> " . $data;
+						$out['summaryCount']++;
 					}
-				}
+				} else {
+					$uniqueJobs = [];
+					foreach ($result AS $item) {
+						$uItem = Json::decode($item);
+						$className = $uItem['job'];
+						$out['summaryCount']++;
+						if (!isset($uniqueJobs[$className])) {
+							$uniqueJobs[$className] = 1;
+						} else {
+							$uniqueJobs[$className]++;
+						}
+					}
 
-				$out['jobs'] = $uniqueJobs;
+					$out[$queueName]['jobs'] = $uniqueJobs;
+				}
 			}
-			$s = VarDumper::export($out);
-			$countNewLines = substr_count($s, "\n");
-			echo $s;
+			$toOut = VarDumper::export($out) . PHP_EOL;
+			$countNewLines = substr_count($toOut, "\n");
+			echo $toOut;
+
+			if ($this->capture) {
+				return self::EXIT_CODE_NORMAL;
+			}
 			sleep(2);
 			$up($countNewLines);
-			unset($result, $out, $s, $countNewLines);
 		}
+
 	}
 
 	/**
@@ -261,6 +253,50 @@ class QueueController extends Controller
 	 */
 	public function actionWork() {
 		$this->process();
+	}
+
+	public function optionAliases() {
+		return [
+			'c' => 'capture',
+			'q' => 'queueName',
+			'd' => 'debug',
+			's' => 'sleep',
+		];
+	}
+
+	public function options($actionID) {
+		$options = [
+			'delayed'        => [
+				'debug',
+			],
+			'listen-delayed' => [
+				'poolFreqSeconds',
+				'poolGapSeconds',
+				'debug',
+			],
+			'listen'         => [
+				'sleep',
+				'tries',
+				'queueName',
+				'queueObjectName',
+				'storeFailedJobs',
+				'debug'
+			],
+			'work'           => [
+				'tries',
+				'queueName',
+				'queueObjectName',
+				'storeFailedJobs',
+				'debug',
+				'sleep',
+			],
+			'monitor'        => [
+				'capture',
+			],
+		];
+		$parent = parent::options($actionID);
+
+		return array_merge($parent, ($options[$actionID] ?? []));
 	}
 
 	/**

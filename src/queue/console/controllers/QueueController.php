@@ -61,6 +61,10 @@ class QueueController extends Controller
 	 */
 	public $capture = false;
 	/**
+	 * @var bool Shows summary count jobs in all queues
+	 */
+	public $countOnly = false;
+	/**
 	 * @var bool Verbose stdout and stderr
 	 */
 	public $debug = false;
@@ -83,6 +87,42 @@ class QueueController extends Controller
 			$this->storeFailedJobs = true;
 		}
 		return parent::beforeAction($action);
+	}
+
+	public function options($actionID) {
+		$options = [
+			'delayed'        => [
+				'debug',
+			],
+			'listen-delayed' => [
+				'poolFreqSeconds',
+				'poolGapSeconds',
+				'debug',
+			],
+			'listen'         => [
+				'sleep',
+				'tries',
+				'queueName',
+				'queueObjectName',
+				'storeFailedJobs',
+				'debug'
+			],
+			'work'           => [
+				'tries',
+				'queueName',
+				'queueObjectName',
+				'storeFailedJobs',
+				'debug',
+				'sleep',
+			],
+			'monitor'        => [
+				'capture',
+				'countOnly',
+			],
+		];
+		$parent = parent::options($actionID);
+
+		return array_merge($parent, ($options[$actionID] ?? []));
 	}
 
 	/**
@@ -170,6 +210,7 @@ class QueueController extends Controller
 	/**
 	 * @param string $q Queue name or "all" to show all queues
 	 * @param bool $showJobs
+	 * @return int
 	 */
 	public function actionMonitor($q = 'queue:default', $showJobs = false) {
 		/** @var Connection $redis */
@@ -233,6 +274,11 @@ class QueueController extends Controller
 					$out[$queueName]['jobs'] = $uniqueJobs;
 				}
 			}
+
+			if ($this->countOnly) {
+				echo $out['summaryCount'];
+				return self::EXIT_CODE_NORMAL;
+			}
 			$toOut = VarDumper::export($out) . PHP_EOL;
 			$countNewLines = substr_count($toOut, "\n");
 			echo $toOut;
@@ -244,6 +290,7 @@ class QueueController extends Controller
 			$up($countNewLines);
 		}
 
+		return self::EXIT_CODE_NORMAL;
 	}
 
 	/**
@@ -258,45 +305,11 @@ class QueueController extends Controller
 	public function optionAliases() {
 		return [
 			'c' => 'capture',
+			'n' => 'countOnly',
 			'q' => 'queueName',
 			'd' => 'debug',
 			's' => 'sleep',
 		];
-	}
-
-	public function options($actionID) {
-		$options = [
-			'delayed'        => [
-				'debug',
-			],
-			'listen-delayed' => [
-				'poolFreqSeconds',
-				'poolGapSeconds',
-				'debug',
-			],
-			'listen'         => [
-				'sleep',
-				'tries',
-				'queueName',
-				'queueObjectName',
-				'storeFailedJobs',
-				'debug'
-			],
-			'work'           => [
-				'tries',
-				'queueName',
-				'queueObjectName',
-				'storeFailedJobs',
-				'debug',
-				'sleep',
-			],
-			'monitor'        => [
-				'capture',
-			],
-		];
-		$parent = parent::options($actionID);
-
-		return array_merge($parent, ($options[$actionID] ?? []));
 	}
 
 	/**

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="yii2queue" default="usage">
+    <property name="APP.name" value="yii2queue"/>
+    <property name="APP.dir" value="${env.dir}"/>
+    <property name="APP.debug" value="${env.debug}"/>
+    <property name="SERVICE.config" value="${env.config}"/>
+    <property file="build.properties"/>
+
+    <target name="usage" description="Print usage">
+        <echo level="info">Usage: phing [-f build.xml] make</echo>
+    </target>
+
+    <target name="make" description="Build yii2queue service init.d script" depends="build.service"/>
+
+    <target name="build.service" hidden="true">
+        <echo level="info">Building service...</echo>
+
+        <copy file="service.sh" tofile="${project.basedir}/../yii2queue" overwrite="true" mode="0775">
+            <filterchain>
+                <replacetokens begintoken="{{" endtoken="}}">
+                    <token key="APP.dir" value="${APP.dir}"/>
+                    <token key="APP.debug" value="${APP.debug}"/>
+                    <token key="SERVICE.config" value="${SERVICE.config}"/>
+                </replacetokens>
+            </filterchain>
+        </copy>
+    </target>
+</project>
